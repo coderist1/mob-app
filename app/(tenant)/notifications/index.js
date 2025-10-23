@@ -1,4 +1,4 @@
-// Tenant notifications screen 
+
 import React, { useState } from 'react';
 import {
   View,
@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { notifications } from '../../../../data/mockData';
-import NotificationItem from '../../../../components/NotificationItem';
+import { notifications } from '../../../data/mockData';
+import NotificationItem from '../../../components/NotificationItem';
 
 export default function Notifications() {
   const [notificationList, setNotificationList] = useState(notifications);

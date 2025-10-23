@@ -1,4 +1,3 @@
-// Notification item component 
 import React from 'react';
 import {
   View,

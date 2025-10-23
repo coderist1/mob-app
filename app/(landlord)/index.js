@@ -1,4 +1,4 @@
-// Landlord home screen 
+
 import React from 'react';
 import {
   View,

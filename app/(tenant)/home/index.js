@@ -1,4 +1,6 @@
-// Tenant home screen 
+
+
+
 import React, { useState } from 'react';
 import {
   View,
@@ -9,10 +11,10 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { boardingHouses } from '../../../../data/mockData';
-import FilterModal from '../../../../components/FilterModal';
-import BoardingHouseCard from '../../../../components/BoardingHouseCard';
-import SearchBar from '../../../../components/SearchBar';
+import { boardingHouses } from '../../../data/mockData';
+import FilterModal from '../../../components/FilterModal';
+import BoardingHouseCard from '../../../components/BoardingHouseCard';
+import SearchBar from '../../../components/SearchBar';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');

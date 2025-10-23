@@ -1,4 +1,6 @@
-// Root index file 
+
+
+
 import React, { useState } from 'react';
 import {
   View,

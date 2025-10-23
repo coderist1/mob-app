@@ -1,4 +1,4 @@
-// Landlord layout navigation 
+
 import { Stack } from 'expo-router';
 
 export default function LandlordLayout() {

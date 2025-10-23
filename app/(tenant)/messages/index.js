@@ -1,4 +1,4 @@
-// Tenant messages screen 
+ 
 import React, { useState } from 'react';
 import {
   View,
@@ -10,8 +10,8 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { messages } from '../../../../data/mockData';
-import SearchBar from '../../../../components/SearchBar';
+import { messages } from '../../../data/mockData';
+import SearchBar from '../../../components/SearchBar';
 
 export default function Messages() {
   const [searchQuery, setSearchQuery] = useState('');
