@@ -29,9 +29,12 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "expo-image-picker"
     ],
     "scheme": "boardease",
-    "newArchEnabled": false
+    "experiments": {
+      "tsconfigPaths": true
+    }
   }
 }

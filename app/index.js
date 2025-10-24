@@ -26,17 +26,17 @@ export default function Login() {
       if (userType === 'tenant') {
         router.replace('/(tenant)/home');
       } else {
-        router.replace('/(landlord)');
+        router.replace('/landlord');
       }
     }
   };
 
   const handleSignUpPress = () => {
     if (userType === 'landlord') {
-      router.push('/(landlord)/signup');
+      router.push('/landlord/signup');
     } else {
       // Assuming you will have a tenant sign-up page
-      router.push('/(tenant)/signup'); // You can create this file later
+      router.push('/tenant/signup'); // You can create this file later
     }
   };
   return (

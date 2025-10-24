@@ -52,7 +52,7 @@ const SignUpForm = () => {
 
   const validatePassword = (password) => {
     // At least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=])[A-Za-z\d!@#$%^&*()_+\-=]{8,}$/;
     return passwordRegex.test(password);
   };
 
@@ -125,7 +125,7 @@ const SignUpForm = () => {
         Alert.alert(
           'Success',
           'Your registration has been submitted for review. We will notify you once your account is verified.',
-          [{ text: 'OK', onPress: () => router.push('/(landlord)') }]
+          [{ text: 'OK', onPress: () => router.push('/landlord') }]
         );
       } catch (error) {
         Alert.alert('Error', 'Something went wrong. Please try again later.');
