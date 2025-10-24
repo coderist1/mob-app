@@ -31,6 +31,14 @@ export default function Login() {
     }
   };
 
+  const handleSignUpPress = () => {
+    if (userType === 'landlord') {
+      router.push('/(landlord)/signup');
+    } else {
+      // Assuming you will have a tenant sign-up page
+      router.push('/(tenant)/signup'); // You can create this file later
+    }
+  };
   return (
     <KeyboardAvoidingView 
       style={styles.container}
@@ -116,7 +124,7 @@ export default function Login() {
 
               <View style={styles.signupContainer}>
                 <Text style={styles.signupText}>Don't have an account? </Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={handleSignUpPress}>
                   <Text style={styles.signupLink}>Sign Up</Text>
                 </TouchableOpacity>
               </View>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import {
   View,
   Text,
@@ -7,43 +7,43 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+const getNotificationIcon = (type) => {
+  switch (type) {
+    case 'new_listing':
+      return { name: 'home', color: '#10b981' };
+    case 'booking':
+      return { name: 'calendar', color: '#3b82f6' };
+    case 'payment':
+      return { name: 'card', color: '#f59e0b' };
+    case 'message':
+      return { name: 'chatbubble', color: '#8b5cf6' };
+    case 'promotion':
+      return { name: 'megaphone', color: '#ec4899' };
+    case 'system':
+      return { name: 'settings', color: '#6b7280' };
+    default:
+      return { name: 'notifications', color: '#667eea' };
+  }
+};
+
+const getNotificationAction = (type) => {
+  switch (type) {
+    case 'new_listing':
+      return 'View Listing';
+    case 'booking':
+      return 'View Booking';
+    case 'payment':
+      return 'Pay Now';
+    case 'message':
+      return 'Reply';
+    case 'promotion':
+      return 'Learn More';
+    default:
+      return 'View';
+  }
+};
+
 const NotificationItem = ({ notification, onPress }) => {
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'new_listing':
-        return { name: 'home', color: '#10b981' };
-      case 'booking':
-        return { name: 'calendar', color: '#3b82f6' };
-      case 'payment':
-        return { name: 'card', color: '#f59e0b' };
-      case 'message':
-        return { name: 'chatbubble', color: '#8b5cf6' };
-      case 'promotion':
-        return { name: 'megaphone', color: '#ec4899' };
-      case 'system':
-        return { name: 'settings', color: '#6b7280' };
-      default:
-        return { name: 'notifications', color: '#667eea' };
-    }
-  };
-
-  const getNotificationAction = (type) => {
-    switch (type) {
-      case 'new_listing':
-        return 'View Listing';
-      case 'booking':
-        return 'View Booking';
-      case 'payment':
-        return 'Pay Now';
-      case 'message':
-        return 'Reply';
-      case 'promotion':
-        return 'Learn More';
-      default:
-        return 'View';
-    }
-  };
-
   const icon = getNotificationIcon(notification.type);
   const actionText = getNotificationAction(notification.type);
 
@@ -170,4 +170,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default NotificationItem;
+export default memo(NotificationItem);

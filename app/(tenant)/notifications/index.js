@@ -4,8 +4,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { notifications } from '../../../data/mockData';
@@ -42,20 +42,25 @@ export default function Notifications() {
         <TouchableOpacity 
           style={styles.clearButton}
           onPress={clearAllNotifications}
+          disabled={unreadCount === 0}
         >
-          <Text style={styles.clearButtonText}>Mark all as read</Text>
+          <Text style={[styles.clearButtonText, unreadCount === 0 && styles.clearButtonDisabled]}>Mark all as read</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         {notificationList.length > 0 ? (
-          notificationList.map((notification) => (
-            <NotificationItem
-              key={notification.id}
-              notification={notification}
-              onPress={() => handleNotificationPress(notification.id)}
-            />
-          ))
+          <FlatList
+            data={notificationList}
+            renderItem={({ item: notification }) => (
+              <NotificationItem
+                notification={notification}
+                onPress={() => handleNotificationPress(notification.id)}
+              />
+            )}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+          />
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="notifications-off" size={64} color="#ccc" />
@@ -65,7 +70,7 @@ export default function Notifications() {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -101,11 +106,16 @@ const styles = StyleSheet.create({
     color: '#667eea',
     fontWeight: '600',
   },
+  clearButtonDisabled: {
+    color: '#ccc',
+  },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
@@ -124,3 +134,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+
+/*
+<ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {notificationList.length > 0 ? (
+          notificationList.map((notification) => (
+            <NotificationItem
+              key={notification.id}
+              notification={notification}
+              onPress={() => handleNotificationPress(notification.id)}
+            />
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="notifications-off" size={64} color="#ccc" />
+            <Text style={styles.emptyStateTitle}>No Notifications</Text>
+            <Text style={styles.emptyStateText}>
+              You're all caught up! New notifications will appear here.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
+*/
