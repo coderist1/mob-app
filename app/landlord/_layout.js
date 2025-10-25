@@ -11,6 +11,10 @@ export default function LandlordLayout() {
           headerShown: true,
         }}
       />
+      <Stack.Screen
+        name="signup"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 }

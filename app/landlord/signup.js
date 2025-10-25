@@ -4,17 +4,17 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   StyleSheet,
+  ScrollView,
   Image,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors';
+import { Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 
 const SignUpForm = () => {
   const [step, setStep] = useState(1);
@@ -271,10 +271,20 @@ const SignUpForm = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.progressContainer}>
-          {[1, 2, 3].map((item) => (
-            <View
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Feather name="arrow-left" size={24} color="white" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Landlord Registration</Text>
+            <View style={{ width: 24 }} /> 
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.progressContainer}>
+              {[1, 2, 3].map((item) => (
+                <View
               key={item}
               style={[
                 styles.progressDot,
@@ -282,39 +292,39 @@ const SignUpForm = () => {
               ]}
             />
           ))}
-        </View>
+            </View>
 
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
+            {step === 1 && renderStep1()}
+            {step === 2 && renderStep2()}
+            {step === 3 && renderStep3()}
 
-        <View style={styles.buttonContainer}>
-          {step > 1 && (
-            <TouchableOpacity
-              style={[styles.button, styles.buttonSecondary]}
-              onPress={() => setStep(step - 1)}
-            >
-              <Text style={styles.buttonTextSecondary}>Previous</Text>
-            </TouchableOpacity>
-          )}
+            <View style={styles.buttonContainer}>
+              {step > 1 && (
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonSecondary]}
+                  onPress={() => setStep(step - 1)}
+                >
+                  <Text style={styles.buttonTextSecondary}>Previous</Text>
+                </TouchableOpacity>
+              )}
 
-          {step < 3 ? (
-            <TouchableOpacity
-              style={[styles.button, styles.buttonPrimary]}
-              onPress={handleNextStep}
-            >
-              <Text style={styles.buttonTextPrimary}>Next</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.button, styles.buttonPrimary]}
-              onPress={handleSubmit}
-            >
-              <Text style={styles.buttonTextPrimary}>Submit</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
+              {step < 3 ? (
+                <TouchableOpacity style={styles.button} onPress={handleNextStep}>
+                  <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradientButton}>
+                    <Text style={styles.buttonTextPrimary}>Next</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+                  <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradientButton}>
+                    <Text style={styles.buttonTextPrimary}>Submit</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 };
