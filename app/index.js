@@ -18,8 +18,8 @@ import { router } from 'expo-router';
 
 export default function Login() {
   const [email, setEmail] = useState('');
+  const [userType, setUserType] = useState('tenant'); // 'tenant' or 'landlord'
   const [password, setPassword] = useState('');
-  const [userType, setUserType] = useState('tenant');
 
   const handleLogin = () => {
     if (email && password) {
@@ -31,14 +31,14 @@ export default function Login() {
     }
   };
 
-  const handleSignUpPress = () => {
-    if (userType === 'landlord') {
-      router.push('/landlord/signup');
-    } else {
-      // Assuming you will have a tenant sign-up page
-      router.push('/tenant/signup'); // You can create this file later
-    }
-  };
+    const handleSignUpPress = () => {
+      if (userType === 'landlord') {
+        router.push('/(auth)/landlord-signup');
+        router.push('/landlord/signup');
+      } else {
+        router.push('/(auth)/tenant-signup');
+      }
+    };
   return (
     <KeyboardAvoidingView 
       style={styles.container}

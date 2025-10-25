@@ -232,7 +232,7 @@ const SignUpForm = () => {
         style={styles.uploadButton}
         onPress={() => pickImage('profileImage')}
       >
-        <MaterialIcons name="add-photo-alternate" size={24} color={Colors.primary} />
+        <MaterialIcons name="add-photo-alternate" size={24} color="#667eea" />
         <Text style={styles.uploadButtonText}>Upload Profile Picture</Text>
       </TouchableOpacity>
       {formData.profileImage && (
@@ -244,7 +244,7 @@ const SignUpForm = () => {
         style={styles.uploadButton}
         onPress={() => pickImage('idPhoto')}
       >
-        <MaterialIcons name="badge" size={24} color={Colors.primary} />
+        <MaterialIcons name="badge" size={24} color="#667eea" />
         <Text style={styles.uploadButtonText}>Upload Valid ID</Text>
       </TouchableOpacity>
       {formData.idPhoto && (
@@ -256,7 +256,7 @@ const SignUpForm = () => {
         style={styles.uploadButton}
         onPress={() => pickImage('businessPermit')}
       >
-        <FontAwesome5 name="file-certificate" size={24} color={Colors.primary} />
+        <FontAwesome5 name="file-certificate" size={24} color="#667eea" />
         <Text style={styles.uploadButtonText}>Upload Business Permit</Text>
       </TouchableOpacity>
       {formData.businessPermit && (
@@ -332,101 +332,138 @@ const SignUpForm = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+  },
+  gradient: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
     padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingHorizontal: 10,
+  },
+  backButton: {},
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 20,
+    marginBottom: 24,
   },
   progressDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#E0E0E0',
-    marginHorizontal: 5,
+    backgroundColor: '#e9ecef',
+    marginHorizontal: 8,
   },
   progressDotActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#667eea',
   },
   stepContainer: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   stepTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: Colors.primary,
+    color: '#333',
+    textAlign: 'center',
   },
   input: {
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 8,
-    padding: 15,
+    borderColor: '#e9ecef',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 15,
     fontSize: 16,
+    color: '#333',
   },
   inputError: {
     borderColor: 'red',
   },
   errorText: {
     color: 'red',
-    fontSize: 12,
+    fontSize: 13,
     marginTop: -10,
     marginBottom: 10,
+    paddingLeft: 4,
   },
   uploadButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: Colors.primary,
-    borderRadius: 8,
+    borderColor: '#667eea',
+    borderRadius: 12,
     padding: 15,
     marginBottom: 15,
+    justifyContent: 'center',
   },
   uploadButtonText: {
     marginLeft: 10,
-    color: Colors.primary,
+    color: '#667eea',
     fontSize: 16,
+    fontWeight: '500',
   },
   uploadedImage: {
     width: '100%',
     height: 200,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 15,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: 20,
-    marginBottom: 40,
   },
   button: {
     flex: 1,
-    padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
     marginHorizontal: 5,
-  },
-  buttonPrimary: {
-    backgroundColor: Colors.primary,
   },
   buttonSecondary: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gradientButton: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
   buttonTextPrimary: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
   buttonTextSecondary: {
-    color: Colors.primary,
-    fontSize: 16,
+    color: '#667eea',
+    fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
   },
