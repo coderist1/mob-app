@@ -13,7 +13,7 @@ export const boardingHouses = [
     distance: '0.8 km',
     description: 'Cozy single rooms with basic amenities. Perfect for students and working professionals.',
     landlord: {
-      name: 'Maria Santos',
+      name: 'Saul Goodman',
       phone: '09123456789',
       verified: true
     }
@@ -31,7 +31,7 @@ export const boardingHouses = [
     distance: '1.2 km',
     description: 'Affordable shared accommodation for students near universities.',
     landlord: {
-      name: 'John Lim',
+      name: 'Mike Ehrmantraut',
       phone: '09198765432',
       verified: true
     }
@@ -49,7 +49,7 @@ export const boardingHouses = [
     distance: '2.1 km',
     description: 'Modern studio units with complete amenities for comfortable living.',
     landlord: {
-      name: 'Robert Tan',
+      name: 'Gustavo Fring',
       phone: '09151234567',
       verified: true
     }
@@ -67,7 +67,7 @@ export const boardingHouses = [
     distance: '0.5 km',
     description: 'Walking distance to Xavier University. Ideal for students.',
     landlord: {
-      name: 'Susan Chen',
+      name: 'Tuco Salamanca',
       phone: '09159876543',
       verified: false
     }
@@ -85,7 +85,7 @@ export const boardingHouses = [
     distance: '1.8 km',
     description: 'Premium studio units with complete facilities and security.',
     landlord: {
-      name: 'Michael Ong',
+      name: 'Walter White',
       phone: '09157778899',
       verified: true
     }
@@ -126,21 +126,61 @@ export const messages = [
   {
     id: '1',
     landlord: {
-      name: 'Maria Santos',
-      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100',
+      name: 'Saul Goodman',
+      image: 'https://media.licdn.com/dms/image/v2/C4D12AQEMLLk06x2Wbw/article-cover_image-shrink_600_2000/article-cover_image-shrink_600_2000/0/1520167327484?e=2147483647&v=beta&t=r-IZtKjxlD6syVp4W8xSThCYNrbiNI6qOrfqjO27qCk',
     },
-    lastMessage: 'Hi! Are you still interested in the room?',
+    lastMessage: 'Where are you? Call me.',
     time: '10:30 AM',
     unread: true
   },
   {
     id: '2',
     landlord: {
-      name: 'John Lim',
-      image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100',
+      name: 'Mike Ehrmantraut',
+      image: 'https://static.wikia.nocookie.net/breakingbad/images/9/9f/Season_4_-_Mike.jpg/revision/latest?cb=20250728074206',
     },
-    lastMessage: 'The room is available for viewing tomorrow.',
+    lastMessage: 'I got the room cleaned for you, kid.',
     time: 'Yesterday',
+    unread: false
+  },
+  {
+    id: '3',
+    landlord: {
+      name: 'Walter White',
+      image: 'https://i.pinimg.com/736x/50/4d/ab/504dab425e2cda6b74b3fd57e56baa30.jpg',
+    },
+    lastMessage: 'Wanna cook?',
+    time: 'Yesterday',
+    unread: false
+  },
+  {
+    id: '4',
+    landlord: {
+      name: 'Brandon Mayhew',
+      image: 'https://static.wikia.nocookie.net/breakingbad/images/a/ac/Badger_2008.png/revision/latest?cb=20220815164007',
+    },
+    lastMessage: 'Me: Yo!',
+    time: 'Yesterday',
+    unread: false
+  },
+  {
+    id: '5',
+    landlord: {
+      name: 'Skinny Pete',
+      image: 'https://static.wikia.nocookie.net/breakingbad/images/e/ea/Skinny_Pete_2009.png/revision/latest?cb=20200611125059',
+    },
+    lastMessage: 'Be there at noon, yo.',
+    time: '2 days ago',
+    unread: false
+  },
+  {
+    id: '6',
+    landlord: {
+      name: 'Skyler White',
+      image: 'https://ew.com/thmb/c-e9oofgxwj9jDc9qWm2RLVND1I=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/breaking-bad-anna-gunn-1-101ba7b9fc7443709d9b75e47aeb2e93.jpg',
+    },
+    lastMessage: 'Well. My name is Skyler White, yo.',
+    time: '2 days ago',
     unread: false
   }
 ];
