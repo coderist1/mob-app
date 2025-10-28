@@ -104,12 +104,12 @@ export default function Menu() {
         {/* User Profile Section */}
         <View style={styles.profileSection}>
           <Image
-            source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150' }}
+            source={{ uri: 'https://i.insider.com/5d9f454ee94e865e924818da?width=700' }}
             style={styles.profileImage}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>John Doe</Text>
-            <Text style={styles.profileEmail}>john.doe@example.com</Text>
+            <Text style={styles.profileName}>Jesse Pinkman</Text>
+            <Text style={styles.profileEmail}>jessepinkmanyo@gmail.com</Text>
             <Text style={styles.profileType}>Tenant</Text>
           </View>
           <TouchableOpacity 
