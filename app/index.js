@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -33,7 +34,6 @@ export default function Login() {
 
     const handleSignUpPress = () => {
       if (userType === 'landlord') {
-        router.push('/(auth)/landlord-signup');
         router.push('/landlord/signup');
       } else {
         router.push('/(auth)/tenant-signup');
@@ -90,25 +90,34 @@ export default function Login() {
             </View>
 
             <View style={styles.form}>
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor="#999"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+              <View style={styles.inputContainer}>
+                <Feather name="mail" size={20} color="#999" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  placeholderTextColor="#999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
               
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
+              <View style={styles.inputContainer}>
+                <Feather name="lock" size={20} color="#999" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+              </View>
 
+              <TouchableOpacity style={styles.forgotPassword}>
+                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+              </TouchableOpacity>
               <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
                 <LinearGradient
                   colors={['#667eea', '#764ba2']}
@@ -116,10 +125,6 @@ export default function Login() {
                 >
                   <Text style={styles.loginButtonText}>Sign In</Text>
                 </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.forgotPassword}>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
 
               <View style={styles.signupContainer}>
@@ -217,19 +222,28 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
   },
-  input: {
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e9ecef',
     borderRadius: 12,
-    padding: 16,
+  },
+  inputIcon: {
+    paddingHorizontal: 15,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingRight: 16,
     fontSize: 16,
     color: '#333',
   },
   loginButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 8,
+    marginTop: 12,
   },
   gradientButton: {
     paddingVertical: 16,
@@ -241,8 +255,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   forgotPassword: {
-    alignItems: 'center',
-    marginTop: 8,
+    alignSelf: 'flex-end',
   },
   forgotPasswordText: {
     color: '#667eea',

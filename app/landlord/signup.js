@@ -26,13 +26,8 @@ const SignUpForm = () => {
     password: '',
     confirmPassword: '',
     phoneNumber: '',
-    
-    // Business Information
-    businessName: '',
-    businessAddress: '',
-    taxId: '',
-    
-    // Additional Information
+        
+    // Document Information
     profileImage: null,
     idPhoto: null,
     businessPermit: null,
@@ -87,22 +82,19 @@ const SignUpForm = () => {
       if (!formData.password) newErrors.password = 'Password is required';
       else if (!validatePassword(formData.password)) 
         newErrors.password = 'Password must contain at least 8 characters, including uppercase, lowercase, number and special character';
-      if (formData.password !== formData.confirmPassword) 
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = 'Please confirm your password';
+      } else if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match';
+      }
       if (!validatePhoneNumber(formData.phoneNumber)) 
         newErrors.phoneNumber = 'Invalid phone number format';
     }
 
     if (step === 2) {
-      if (!formData.businessName) newErrors.businessName = 'Business name is required';
-      if (!formData.businessAddress) newErrors.businessAddress = 'Business address is required';
-      if (!formData.taxId) newErrors.taxId = 'Tax ID is required';
-    }
-
-    if (step === 3) {
       if (!formData.profileImage) newErrors.profileImage = 'Profile image is required';
       if (!formData.idPhoto) newErrors.idPhoto = 'ID photo is required';
-      if (!formData.businessPermit) newErrors.businessPermit = 'Business permit is required';
+      // Business permit can be optional
     }
 
     setErrors(newErrors);
@@ -192,38 +184,6 @@ const SignUpForm = () => {
     </View>
   );
 
-  const renderStep2 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Business Information</Text>
-      
-      <TextInput
-        style={[styles.input, errors.businessName && styles.inputError]}
-        placeholder="Business Name"
-        value={formData.businessName}
-        onChangeText={(text) => setFormData({ ...formData, businessName: text })}
-      />
-      {errors.businessName && <Text style={styles.errorText}>{errors.businessName}</Text>}
-
-      <TextInput
-        style={[styles.input, errors.businessAddress && styles.inputError]}
-        placeholder="Business Address"
-        multiline
-        numberOfLines={3}
-        value={formData.businessAddress}
-        onChangeText={(text) => setFormData({ ...formData, businessAddress: text })}
-      />
-      {errors.businessAddress && <Text style={styles.errorText}>{errors.businessAddress}</Text>}
-
-      <TextInput
-        style={[styles.input, errors.taxId && styles.inputError]}
-        placeholder="Tax ID"
-        value={formData.taxId}
-        onChangeText={(text) => setFormData({ ...formData, taxId: text })}
-      />
-      {errors.taxId && <Text style={styles.errorText}>{errors.taxId}</Text>}
-    </View>
-  );
-
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Document Upload</Text>
@@ -257,7 +217,7 @@ const SignUpForm = () => {
         onPress={() => pickImage('businessPermit')}
       >
         <FontAwesome5 name="file-certificate" size={24} color="#667eea" />
-        <Text style={styles.uploadButtonText}>Upload Business Permit</Text>
+        <Text style={styles.uploadButtonText}>Upload Business Permit (Optional)</Text>
       </TouchableOpacity>
       {formData.businessPermit && (
         <Image source={{ uri: formData.businessPermit }} style={styles.uploadedImage} />
@@ -283,7 +243,7 @@ const SignUpForm = () => {
 
           <View style={styles.card}>
             <View style={styles.progressContainer}>
-              {[1, 2, 3].map((item) => (
+              {[1, 2].map((item) => (
                 <View
               key={item}
               style={[
@@ -294,9 +254,8 @@ const SignUpForm = () => {
           ))}
             </View>
 
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
+            {step === 1 && renderStep1()}            
+            {step === 2 && renderStep3()}
 
             <View style={styles.buttonContainer}>
               {step > 1 && (
@@ -308,7 +267,7 @@ const SignUpForm = () => {
                 </TouchableOpacity>
               )}
 
-              {step < 3 ? (
+              {step < 2 ? (
                 <TouchableOpacity style={styles.button} onPress={handleNextStep}>
                   <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradientButton}>
                     <Text style={styles.buttonTextPrimary}>Next</Text>

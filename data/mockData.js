@@ -6,16 +6,22 @@ export const boardingHouses = [
     price: 3500,
     location: 'Divisoria, Cagayan de Oro',
     rating: 4.5,
-    reviews: 128,
-    image: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=400',
+    reviews: 128,    
+    images: [
+      'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=400',
+      'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400',
+      'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400'
+    ],
+    floorPlans: ['https://example.com/floorplan1.jpg'],
+    virtualTourUrl: 'https://example.com/virtual-tour',
     type: 'Single Room',
-    amenities: ['WiFi', 'Laundry', 'Kitchen', 'CR'],
+    amenities: ['WiFi', 'Laundry', 'Kitchen', 'CR', 'Utilities Included'],
     distance: '0.8 km',
     description: 'Cozy single rooms with basic amenities. Perfect for students and working professionals.',
     landlord: {
       name: 'Saul Goodman',
       phone: '09123456789',
-      verified: true
+      verified: true,
     }
   },
   {
@@ -24,8 +30,12 @@ export const boardingHouses = [
     price: 2800,
     location: 'Nazareth, Cagayan de Oro',
     rating: 4.2,
-    reviews: 95,
-    image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400',
+    reviews: 95,    
+    images: [
+      'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400'
+    ],
+    floorPlans: [],
+    virtualTourUrl: null,
     type: 'Shared Room',
     amenities: ['WiFi', 'Study Area', 'CR', '24/7 Security'],
     distance: '1.2 km',
@@ -42,10 +52,14 @@ export const boardingHouses = [
     price: 4500,
     location: 'Carmen, Cagayan de Oro',
     rating: 4.8,
-    reviews: 203,
-    image: 'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=400',
+    reviews: 203,    
+    images: [
+      'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?w=400'
+    ],
+    floorPlans: [],
+    virtualTourUrl: null,
     type: 'Studio Unit',
-    amenities: ['WiFi', 'Aircon', 'Kitchen', 'CR', 'Parking'],
+    amenities: ['WiFi', 'Aircon', 'Kitchen', 'CR', 'Parking', 'Pets Allowed'],
     distance: '2.1 km',
     description: 'Modern studio units with complete amenities for comfortable living.',
     landlord: {
@@ -60,8 +74,12 @@ export const boardingHouses = [
     price: 3200,
     location: 'Corrales Ext, Cagayan de Oro',
     rating: 4.3,
-    reviews: 87,
-    image: 'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=400',
+    reviews: 87,    
+    images: [
+      'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=400'
+    ],
+    floorPlans: [],
+    virtualTourUrl: null,
     type: 'Single Room',
     amenities: ['WiFi', 'CR', 'Study Area'],
     distance: '0.5 km',
@@ -78,8 +96,12 @@ export const boardingHouses = [
     price: 5200,
     location: 'Lapasan, Cagayan de Oro',
     rating: 4.6,
-    reviews: 156,
-    image: 'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=400',
+    reviews: 156,    
+    images: [
+      'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=400'
+    ],
+    floorPlans: [],
+    virtualTourUrl: null,
     type: 'Studio Unit',
     amenities: ['WiFi', 'Aircon', 'Kitchen', 'CR', 'Parking', 'Laundry'],
     distance: '1.8 km',

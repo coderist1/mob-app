@@ -57,6 +57,7 @@ export default function Home() {
   });
 
   const clearFilters = () => {
+    // Also clear withPhotos filter if it was added
     setActiveFilters(null);
   };
 
