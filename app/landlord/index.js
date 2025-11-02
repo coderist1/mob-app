@@ -95,9 +95,6 @@ export default function LandlordPortal() {
 
       <View style={{ height: 40 }} />
       </ScrollView>
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/landlord/create-listing')}>
-        <Feather name="plus" size={24} color="#fff" />
-      </TouchableOpacity>
     </View>
   );
 }
