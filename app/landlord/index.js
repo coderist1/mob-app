@@ -49,11 +49,7 @@ export default function LandlordPortal() {
           <Text style={styles.statValue}>{listings.length}</Text>
           <Text style={styles.statLabel}>Listings</Text>
         </View>
-        <View style={styles.statCard}>
-          <Feather name="message-square" size={22} color={Colors.primary} />
-          <Text style={styles.statValue}>12</Text>
-          <Text style={styles.statLabel}>Inquiries</Text>
-        </View>
+    
         <View style={styles.statCard}>
           <Feather name="home" size={22} color={Colors.primary} />
           <Text style={styles.statValue}>89%</Text>
