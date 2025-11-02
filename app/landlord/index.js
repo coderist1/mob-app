@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   View,
@@ -34,6 +33,11 @@ export default function LandlordPortal() {
       ]
     );
   };
+  
+  // NEW: Function to navigate to the create-listing screen with the listing ID
+  const handleEditListing = (id) => {
+    router.push(`/landlord/create-listing?id=${id}`);
+  };
 
   return (
     <View style={styles.page}>
@@ -49,7 +53,11 @@ export default function LandlordPortal() {
           <Text style={styles.statValue}>{listings.length}</Text>
           <Text style={styles.statLabel}>Listings</Text>
         </View>
-    
+        <View style={styles.statCard}>
+          <Feather name="message-square" size={22} color={Colors.primary} />
+          <Text style={styles.statValue}>12</Text>
+          <Text style={styles.statLabel}>Inquiries</Text>
+        </View>
         <View style={styles.statCard}>
           <Feather name="home" size={22} color={Colors.primary} />
           <Text style={styles.statValue}>89%</Text>
@@ -61,15 +69,20 @@ export default function LandlordPortal() {
       <View style={styles.listingsRow}>
         {listings.map((listing) => (
           <View key={listing.id} style={styles.card}>
-            <TouchableOpacity style={styles.cardClickable} onPress={() => router.push('/landlord/create-listing')}>
+            {/* The main card body is now a View to keep the actions separate */}
+            <View style={styles.cardClickable}>
               <Image source={{ uri: listing.images[0] }} style={styles.cardImage} />
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{listing.name}</Text>
                 <Text style={styles.cardSub} numberOfLines={1}>{listing.location}</Text>
                 <Text style={styles.cardPrice}>₱{listing.price.toLocaleString()}</Text>
               </View>
-            </TouchableOpacity>
+            </View>
+            {/* UPDATED: Added Edit button to cardActions */}
             <View style={styles.cardActions}>
+              <TouchableOpacity style={styles.editButton} onPress={() => handleEditListing(listing.id)}>
+                <Feather name="edit" size={20} color={Colors.primary} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteListing(listing.id)}>
                 <Feather name="trash-2" size={20} color="#ef4444" />
               </TouchableOpacity>
@@ -152,8 +165,16 @@ const styles = StyleSheet.create({
   cardSub: { color: '#777', marginTop: 4 },
   cardPrice: { marginTop: 8, color: Colors.primary, fontWeight: 'bold', fontSize: 16 },
   cardActions: {
-    justifyContent: 'center',
+    justifyContent: 'space-around', // Changed for two icons
     paddingHorizontal: 16,
+    borderLeftWidth: 1, // Visual separation
+    borderColor: '#f0f0f0',
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#e0f2fe', // Light blue background for edit
+    marginBottom: 4, // Spacing between edit and delete
   },
   deleteButton: {
     padding: 8,

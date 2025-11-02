@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,22 @@ import {
   Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+// CRITICAL FIX: Import useLocalSearchParams
+import { router, useLocalSearchParams } from 'expo-router'; 
 import { Colors } from '../../constants/Colors';
 import PropertyImageGrid from '../../components/PropertyImageGrid';
+// CRITICAL FIX: Import mock data to find the listing
+import { boardingHouses } from '../../data/mockData'; 
 
 export default function CreateListing() {
+  const params = useLocalSearchParams(); // Get URL parameters (like 'id')
+  
+  // NEW STATES for conditional rendering
+  const [isEditing, setIsEditing] = useState(false);
+  const [heading, setHeading] = useState('Create Property Listing');
+  const [submitText, setSubmitText] = useState('Create Listing');
+
+  // Existing form states
   const [title, setTitle] = useState('');
   const [address, setAddress] = useState('');
   const [rent, setRent] = useState('');
@@ -33,6 +44,37 @@ export default function CreateListing() {
   // images and floor plans
   const [photos, setPhotos] = useState([]);
   const [floorPlans, setFloorPlans] = useState([]);
+
+  // CRITICAL FIX: Effect to load data if editing
+  useEffect(() => {
+    // Check if the URL contains an 'id' parameter
+    if (params.id) {
+      const listingId = params.id;
+      
+      // Find the listing in your mock data
+      const existingListing = boardingHouses.find(b => String(b.id) === listingId);
+
+      if (existingListing) {
+        // 1. Populate the form fields with existing data
+        setTitle(existingListing.name);
+        setAddress(existingListing.location);
+        // Ensure rent is converted back to a string for TextInput
+        setRent(String(existingListing.price)); 
+        setDescription(existingListing.details || ''); 
+        setAmenities(existingListing.amenities || { // Use default if amenities are missing
+            parking: false, utilitiesIncluded: false, petsAllowed: false, 
+            wifi: false, furnished: false, 
+        });
+        setPhotos(existingListing.images || []);
+        
+        // 2. Update states for editing mode
+        setIsEditing(true);
+        setHeading('Edit Property Listing');
+        setSubmitText('Update Listing');
+      }
+    }
+  }, [params.id]);
+
 
   const pickImage = async (setter, multiple = false) => {
     try {
@@ -58,6 +100,7 @@ export default function CreateListing() {
     setAmenities((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // UPDATED: Submit function handles both Create and Update
   const validateAndSubmit = () => {
     if (!title.trim()) return Alert.alert('Validation', 'Title is required');
     if (!address.trim()) return Alert.alert('Validation', 'Address is required');
@@ -73,18 +116,28 @@ export default function CreateListing() {
       photos,
       floorPlans,
     };
-
-    // TODO: Replace with API call to save listing
-    console.log('Listing payload:', payload);
-    Alert.alert('Success', 'Listing created (mock).', [
-      { text: 'OK', onPress: () => router.replace('/landlord') },
-    ]);
+    
+    if (isEditing) {
+      // Logic for UPDATE
+      // The listing ID is in params.id
+      console.log(`Updating listing ${params.id} with payload:`, payload);
+      Alert.alert('Success', 'Listing updated (mock).', [
+        { text: 'OK', onPress: () => router.replace('/landlord') },
+      ]);
+    } else {
+      // Logic for CREATE
+      console.log('Listing payload:', payload);
+      Alert.alert('Success', 'Listing created (mock).', [
+        { text: 'OK', onPress: () => router.replace('/landlord') },
+      ]);
+    }
   };
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.heading}>Create Property Listing</Text>
+        {/* HEADING is now conditional */}
+        <Text style={styles.heading}>{heading}</Text>
 
         <Text style={styles.label}>Title</Text>
         <TextInput style={styles.input} placeholder="e.g., Cozy 2BR near downtown" value={title} onChangeText={setTitle} />
@@ -150,7 +203,8 @@ export default function CreateListing() {
         />
 
         <TouchableOpacity style={styles.submitBtn} onPress={validateAndSubmit}>
-          <Text style={styles.submitText}>Create Listing</Text>
+          {/* BUTTON TEXT is now conditional */}
+          <Text style={styles.submitText}>{submitText}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
