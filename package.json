@@ -10,7 +10,11 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
+<<<<<<< HEAD
     "expo": "54.0.19",
+=======
+    "expo": "^54.0.19",
+>>>>>>> 7b4001c (feat(landlord): Initial local commit with full 5-tab navigation)
     "expo-constants": "~18.0.10",
     "expo-font": "~14.0.9",
     "expo-image-picker": "~17.0.8",
