@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useContext } from 'react'; // ADDED: useContext
 import {
   View,
   Text,
@@ -11,10 +11,13 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { boardingHouses } from '../../data/mockData';
+// NOTE: We no longer import mockData, we use the context instead
+// import { boardingHouses } from '../../data/mockData'; 
+import { GlobalListingContext } from './_layout'; // ADDED: Import context
 
 export default function LandlordPortal() {
-  const [listings, setListings] = useState(boardingHouses);
+  // CRITICAL FIX: Read data and functions from the global context
+  const { listings, deleteListing } = useContext(GlobalListingContext); 
 
   const handleDeleteListing = (id) => {
     Alert.alert(
@@ -26,15 +29,15 @@ export default function LandlordPortal() {
           style: "cancel"
         },
         { 
+          // CRITICAL FIX: Use the deleteListing function from context
           text: "Delete", 
-          onPress: () => setListings(currentListings => currentListings.filter(listing => listing.id !== id)),
+          onPress: () => deleteListing(id),
           style: "destructive" 
         }
       ]
     );
   };
   
-  // NEW: Function to navigate to the create-listing screen with the listing ID
   const handleEditListing = (id) => {
     router.push(`/landlord/create-listing?id=${id}`);
   };
@@ -50,7 +53,8 @@ export default function LandlordPortal() {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Feather name="list" size={22} color={Colors.primary} />
-          <Text style={styles.statValue}>{listings.length}</Text>
+          {/* Use listings.length from context */}
+          <Text style={styles.statValue}>{listings.length}</Text> 
           <Text style={styles.statLabel}>Listings</Text>
         </View>
         <View style={styles.statCard}>
@@ -69,7 +73,6 @@ export default function LandlordPortal() {
       <View style={styles.listingsRow}>
         {listings.map((listing) => (
           <View key={listing.id} style={styles.card}>
-            {/* The main card body is now a View to keep the actions separate */}
             <View style={styles.cardClickable}>
               <Image source={{ uri: listing.images[0] }} style={styles.cardImage} />
               <View style={styles.cardBody}>
@@ -78,7 +81,6 @@ export default function LandlordPortal() {
                 <Text style={styles.cardPrice}>₱{listing.price.toLocaleString()}</Text>
               </View>
             </View>
-            {/* UPDATED: Added Edit button to cardActions */}
             <View style={styles.cardActions}>
               <TouchableOpacity style={styles.editButton} onPress={() => handleEditListing(listing.id)}>
                 <Feather name="edit" size={20} color={Colors.primary} />
@@ -165,16 +167,16 @@ const styles = StyleSheet.create({
   cardSub: { color: '#777', marginTop: 4 },
   cardPrice: { marginTop: 8, color: Colors.primary, fontWeight: 'bold', fontSize: 16 },
   cardActions: {
-    justifyContent: 'space-around', // Changed for two icons
+    justifyContent: 'space-around', 
     paddingHorizontal: 16,
-    borderLeftWidth: 1, // Visual separation
+    borderLeftWidth: 1, 
     borderColor: '#f0f0f0',
   },
   editButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#e0f2fe', // Light blue background for edit
-    marginBottom: 4, // Spacing between edit and delete
+    backgroundColor: '#e0f2fe', 
+    marginBottom: 4, 
   },
   deleteButton: {
     padding: 8,
