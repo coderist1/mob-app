@@ -39,7 +39,7 @@ export default function LandlordPortal() {
   };
   
   const handleEditListing = (id) => {
-    router.push(`/landlord/create-listing?id=${id}`);
+    router.push(`/landlord/edit-listing?id=${id}`);
   };
 
   return (
