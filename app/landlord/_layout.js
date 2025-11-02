@@ -1,9 +1,9 @@
 import { Tabs } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors'; // Required if using Colors.primary
+// Assuming you have a Colors file, which is often the case:
+import { Colors } from '../../constants/Colors'; 
 
 export default function LandlordLayout() {
-  // Use a consistent primary color based on the existing components
   const primaryColor = Colors.primary || '#667eea'; 
 
   return (
