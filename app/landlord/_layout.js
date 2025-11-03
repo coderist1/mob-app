@@ -128,14 +128,6 @@ export default function LandlordLayout() {
           }}
         />
         
-        <Tabs.Screen
-          name="signup" 
-          options={{
-            href: null,
-            headerShown: false,
-          }}
-        />
-        
       </Tabs>
     </GlobalListingContext.Provider>
   );

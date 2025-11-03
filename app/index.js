@@ -45,8 +45,9 @@ export default function Login() {
 
     const handleSignUpPress = () => {
       if (userType === 'landlord') {
-        router.push('/landlord/signup');
+        router.push('/(auth)/landlord-signup');
       } else {
+        // Tenant signup remains under the auth group
         router.push('/(auth)/tenant-signup');
       }
     };

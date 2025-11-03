@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,11 @@ import { router } from 'expo-router';
 // Import Colors to maintain Landlord theme consistency
 import { Colors } from '../../constants/Colors';
 import { useAuth } from './AuthContext';
+import ShareProfileModal from '../../components/ShareProfileModal';
 
 export default function LandlordMenuScreen() {
   const { user, logout } = useAuth();
+  const [isShareModalVisible, setShareModalVisible] = useState(false);
 
   // Use Landlord-specific menu items
   const menuItems = [
@@ -85,6 +87,7 @@ export default function LandlordMenuScreen() {
   };
 
   return (
+    <>
     <View style={styles.container}>
       <View style={styles.header}>
         {/* Title matches the Tenant Menu */}
@@ -101,14 +104,15 @@ export default function LandlordMenuScreen() {
             style={styles.profileImage}
           />
           <View style={styles.profileInfo}>
+            <Text style={styles.profileName}>{user?.name || 'Landlord'}</Text>
             <Text style={styles.profileEmail}>{user?.email || 'No email'}</Text>
             <Text style={styles.profileType}>Landlord</Text>
           </View>
           <TouchableOpacity 
-            style={styles.editProfileButton}
-            onPress={() => console.log('Edit Profile')}
+            style={styles.shareProfileButton}
+            onPress={() => setShareModalVisible(true)}
           >
-            <Ionicons name="create" size={20} color={Colors.primary || '#667eea'} />
+            <Ionicons name="qr-code" size={24} color={Colors.primary || '#667eea'} />
           </TouchableOpacity>
         </View>
 
@@ -144,6 +148,12 @@ export default function LandlordMenuScreen() {
         </TouchableOpacity>
       </ScrollView>
     </View>
+    <ShareProfileModal
+        visible={isShareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        user={user}
+      />
+    </>
   );
 }
 
@@ -210,8 +220,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
     alignSelf: 'flex-start',
-  },
-  editProfileButton: {
+  },  
+  shareProfileButton: {
+    padding: 12,
+    borderRadius: 25,
+    backgroundColor: '#f0f4ff',
+    marginLeft: 'auto',
     padding: 8,
   },
   menuSection: {

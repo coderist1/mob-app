@@ -6,48 +6,225 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Feather, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 
-export default function LandlordSignUp() {
+const SignUpForm = () => {
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    fullName: '',
+    // Personal Information
+    firstName: '',
+    lastName: '',
     email: '',
-    phone: '',
     password: '',
     confirmPassword: '',
-    businessName: '',
+    phoneNumber: '',
+        
+    // Document Information
+    profileImage: null,
+    idPhoto: null,
+    businessPermit: null,
+    
+    // Terms and Verification
+    isTermsAccepted: false,
+    isEmailVerified: false,
   });
 
-  const handleSignUp = () => {
-    // Basic validation
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.password || 
-        !formData.confirmPassword || !formData.businessName) {
-      Alert.alert('Error', 'Please fill in all fields.');
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match.');
-      return;
-    }
+  const [errors, setErrors] = useState({});
 
-    // Here you would typically make an API call to register the landlord
-    console.log('Signing up landlord with:', formData);
-    Alert.alert(
-      'Success',
-      'Account created successfully! Please sign in.',
-      [{ text: 'OK', onPress: () => router.replace('/index') }]
-    );
+  // Validation functions
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
-  const updateFormData = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const validatePassword = (password) => {
+    // At least 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=])[A-Za-z\d!@#$%^&*()_+\-=]{8,}$/;
+    return passwordRegex.test(password);
   };
+
+  const validatePhoneNumber = (phone) => {
+    const phoneRegex = /^\+?[\d\s-]{10,}$/;
+    return phoneRegex.test(phone);
+  };
+
+  // Image picker function
+  const pickImage = async (field) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setFormData({ ...formData, [field]: result.assets[0].uri });
+    }
+  };
+
+  // Validate current step
+  const validateStep = () => {
+    const newErrors = {};
+
+    if (step === 1) {
+      if (!formData.firstName) newErrors.firstName = 'First name is required';
+      if (!formData.lastName) newErrors.lastName = 'Last name is required';
+      if (!formData.email) newErrors.email = 'Email is required';
+      else if (!validateEmail(formData.email)) newErrors.email = 'Invalid email format';
+      if (!formData.password) newErrors.password = 'Password is required';
+      else if (!validatePassword(formData.password)) 
+        newErrors.password = 'Password must contain at least 8 characters, including uppercase, lowercase, number and special character';
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = 'Please confirm your password';
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+      if (!validatePhoneNumber(formData.phoneNumber)) 
+        newErrors.phoneNumber = 'Invalid phone number format';
+    }
+
+    if (step === 2) {
+      if (!formData.profileImage) newErrors.profileImage = 'Profile image is required';
+      if (!formData.idPhoto) newErrors.idPhoto = 'ID photo is required';
+      // Business permit can be optional
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle next step
+  const handleNextStep = () => {
+    if (validateStep()) {
+      setStep(step + 1);
+    }
+  };
+
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (validateStep()) {
+      try {
+        // Here you would typically make an API call to register the landlord
+        console.log('Form submitted:', formData);
+        Alert.alert(
+          'Success',
+          'Your registration has been submitted for review. We will notify you once your account is verified.',
+          [{ text: 'OK', onPress: () => router.replace('/index') }]
+        );
+      } catch (error) {
+        Alert.alert('Error', 'Something went wrong. Please try again later.');
+      }
+    }
+  };
+
+  const renderStep1 = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Personal Information</Text>
+      
+      <TextInput
+        style={[styles.input, errors.firstName && styles.inputError]}
+        placeholder="First Name"
+        value={formData.firstName}
+        onChangeText={(text) => setFormData({ ...formData, firstName: text })}
+      />
+      {errors.firstName && <Text style={styles.errorText}>{errors.firstName}</Text>}
+
+      <TextInput
+        style={[styles.input, errors.lastName && styles.inputError]}
+        placeholder="Last Name"
+        value={formData.lastName}
+        onChangeText={(text) => setFormData({ ...formData, lastName: text })}
+      />
+      {errors.lastName && <Text style={styles.errorText}>{errors.lastName}</Text>}
+
+      <TextInput
+        style={[styles.input, errors.email && styles.inputError]}
+        placeholder="Email"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        value={formData.email}
+        onChangeText={(text) => setFormData({ ...formData, email: text })}
+      />
+      {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+
+      <TextInput
+        style={[styles.input, errors.password && styles.inputError]}
+        placeholder="Password"
+        secureTextEntry
+        value={formData.password}
+        onChangeText={(text) => setFormData({ ...formData, password: text })}
+      />
+      {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+
+      <TextInput
+        style={[styles.input, errors.confirmPassword && styles.inputError]}
+        placeholder="Confirm Password"
+        secureTextEntry
+        value={formData.confirmPassword}
+        onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+      />
+      {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+
+      <TextInput
+        style={[styles.input, errors.phoneNumber && styles.inputError]}
+        placeholder="Phone Number"
+        keyboardType="phone-pad"
+        value={formData.phoneNumber}
+        onChangeText={(text) => setFormData({ ...formData, phoneNumber: text })}
+      />
+      {errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
+    </View>
+  );
+
+  const renderStep2 = () => (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Document Upload</Text>
+
+      <TouchableOpacity
+        style={styles.uploadButton}
+        onPress={() => pickImage('profileImage')}
+      >
+        <MaterialIcons name="add-photo-alternate" size={24} color="#667eea" />
+        <Text style={styles.uploadButtonText}>Upload Profile Picture</Text>
+      </TouchableOpacity>
+      {formData.profileImage && (
+        <Image source={{ uri: formData.profileImage }} style={styles.uploadedImage} />
+      )}
+      {errors.profileImage && <Text style={styles.errorText}>{errors.profileImage}</Text>}
+
+      <TouchableOpacity
+        style={styles.uploadButton}
+        onPress={() => pickImage('idPhoto')}
+      >
+        <MaterialIcons name="badge" size={24} color="#667eea" />
+        <Text style={styles.uploadButtonText}>Upload Valid ID</Text>
+      </TouchableOpacity>
+      {formData.idPhoto && (
+        <Image source={{ uri: formData.idPhoto }} style={styles.uploadedImage} />
+      )}
+      {errors.idPhoto && <Text style={styles.errorText}>{errors.idPhoto}</Text>}
+
+      <TouchableOpacity
+        style={styles.uploadButton}
+        onPress={() => pickImage('businessPermit')}
+      >
+        <FontAwesome5 name="file-certificate" size={24} color="#667eea" />
+        <Text style={styles.uploadButtonText}>Upload Business Permit (Optional)</Text>
+      </TouchableOpacity>
+      {formData.businessPermit && (
+        <Image source={{ uri: formData.businessPermit }} style={styles.uploadedImage} />
+      )}
+      {errors.businessPermit && <Text style={styles.errorText}>{errors.businessPermit}</Text>}
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -55,111 +232,57 @@ export default function LandlordSignUp() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Feather name="arrow-left" size={24} color="white" />
-            </TouchableOpacity>
-            <Text style={styles.title}>Landlord Sign Up</Text>
-            <View style={{ width: 24 }} /> 
+            <Text style={styles.title}>Landlord Registration</Text>
           </View>
-          <Text style={styles.subtitle}>Join BoardEase to list your properties</Text>
 
           <View style={styles.card}>
-            <View style={styles.form}>
-              <View style={styles.inputContainer}>
-                <Feather name="user" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Full Name"
-                  placeholderTextColor="#999"
-                  value={formData.fullName}
-                  onChangeText={(text) => updateFormData('fullName', text)}
-                />
-              </View>
+            <View style={styles.progressContainer}>
+              {[1, 2].map((item) => (
+                <View
+              key={item}
+              style={[
+                styles.progressDot,
+                item <= step ? styles.progressDotActive : null,
+              ]}
+            />
+          ))}
+            </View>
 
-              <View style={styles.inputContainer}>
-                <Feather name="mail" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email Address"
-                  placeholderTextColor="#999"
-                  value={formData.email}
-                  onChangeText={(text) => updateFormData('email', text)}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
+            {step === 1 && renderStep1()}            
+            {step === 2 && renderStep2()}
 
-              <View style={styles.inputContainer}>
-                <Feather name="phone" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Phone Number"
-                  placeholderTextColor="#999"
-                  value={formData.phone}
-                  onChangeText={(text) => updateFormData('phone', text)}
-                  keyboardType="phone-pad"
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Feather name="briefcase" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Business Name"
-                  placeholderTextColor="#999"
-                  value={formData.businessName}
-                  onChangeText={(text) => updateFormData('businessName', text)}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Feather name="lock" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Password"
-                  placeholderTextColor="#999"
-                  value={formData.password}
-                  onChangeText={(text) => updateFormData('password', text)}
-                  secureTextEntry
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Feather name="lock" size={20} color="#999" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm Password"
-                  placeholderTextColor="#999"
-                  value={formData.confirmPassword}
-                  onChangeText={(text) => updateFormData('confirmPassword', text)}
-                  secureTextEntry
-                />
-              </View>
-
-              <TouchableOpacity style={styles.signupButton} onPress={handleSignUp}>
-                <LinearGradient
-                  colors={['#667eea', '#764ba2']}
-                  style={styles.gradientButton}
+            <View style={styles.buttonContainer}>
+              {step > 1 && (
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonSecondary]}
+                  onPress={() => setStep(step - 1)}
                 >
-                  <Text style={styles.signupButtonText}>Sign Up</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <View style={styles.signinContainer}>
-                <Text style={styles.signinText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => router.replace('/index')}>
-                  <Text style={styles.signinLink}>Sign In</Text>
+                  <Text style={styles.buttonTextSecondary}>Previous</Text>
                 </TouchableOpacity>
-              </View>
+              )}
+
+              {step < 2 ? (
+                <TouchableOpacity style={styles.button} onPress={handleNextStep}>
+                  <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradientButton}>
+                    <Text style={styles.buttonTextPrimary}>Next</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+                  <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradientButton}>
+                    <Text style={styles.buttonTextPrimary}>Submit</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </ScrollView>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { 
@@ -176,22 +299,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    justifyContent: 'center',
+    marginBottom: 20,
     paddingHorizontal: 10,
   },
   backButton: {},
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'white',
-    opacity: 0.8,
-    textAlign: 'center',
-    marginBottom: 30,
   },
   card: {
     backgroundColor: 'white',
@@ -203,53 +319,109 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
   },
-  form: { 
-    gap: 16 
-  },
-  inputContainer: {
+  progressContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 24,
+  },
+  progressDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#e9ecef',
+    marginHorizontal: 8,
+  },
+  progressDotActive: {
+    backgroundColor: '#667eea',
+  },
+  stepContainer: {
+    marginBottom: 10,
+  },
+  stepTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
+    textAlign: 'center',
+  },
+  input: {
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e9ecef',
     borderRadius: 12,
-  },
-  inputIcon: {
-    paddingHorizontal: 15,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 16,
-    paddingRight: 16,
+    padding: 16,
+    marginBottom: 15,
     fontSize: 16,
     color: '#333',
   },
-  signupButton: {
+  inputError: {
+    borderColor: 'red',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 13,
+    marginTop: -10,
+    marginBottom: 10,
+    paddingLeft: 4,
+  },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#667eea',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    justifyContent: 'center',
+  },
+  uploadButtonText: {
+    marginLeft: 10,
+    color: '#667eea',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  uploadedImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  button: {
+    flex: 1,
     borderRadius: 12,
     overflow: 'hidden',
-    marginTop: 16,
+    marginHorizontal: 5,
+  },
+  buttonSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   gradientButton: {
     paddingVertical: 16,
     alignItems: 'center',
   },
-  signupButtonText: {
-    color: 'white',
+  buttonTextPrimary: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
-  signinContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-  },
-  signinText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  signinLink: {
+  buttonTextSecondary: {
     color: '#667eea',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
+
+export default SignUpForm;
