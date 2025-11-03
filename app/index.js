@@ -16,17 +16,28 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from './landlord/AuthContext';
 
 export default function Login() {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [userType, setUserType] = useState('tenant'); // 'tenant' or 'landlord'
   const [password, setPassword] = useState('');
 
   const handleLogin = () => {
     if (email && password) {
+      // In a real app, you would fetch user data from an API here
       if (userType === 'tenant') {
+        // For now, we just navigate for tenants
         router.replace('/(tenant)/home');
       } else {
+        // For landlords, simulate a login and set user data
+        const landlordData = {
+          name: 'Walter White', // This would come from your API
+          email: email,
+          photoURL: 'https://i.insider.com/5d9f454ee94e865e924818da?width=700'
+        };
+        login(landlordData);
         router.replace('/landlord');
       }
     }

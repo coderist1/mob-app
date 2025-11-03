@@ -11,9 +11,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 // Import Colors to maintain Landlord theme consistency
-import { Colors } from '../../constants/Colors'; 
+import { Colors } from '../../constants/Colors';
+import { useAuth } from './AuthContext';
 
 export default function LandlordMenuScreen() {
+  const { user, logout } = useAuth();
+
   // Use Landlord-specific menu items
   const menuItems = [
     {
@@ -61,6 +64,7 @@ export default function LandlordMenuScreen() {
           text: "Log Out",
           style: "destructive",
           onPress: () => {
+            logout();
             // Navigate back to the initial landing page/login screen
             router.replace('/');
           }
@@ -91,12 +95,13 @@ export default function LandlordMenuScreen() {
         {/* User Profile Section (Replicates Tenant style) */}
         <View style={styles.profileSection}>
           <Image
-            source={{ uri: 'https://i.insider.com/5d9f454ee94e865e924818da?width=700' }}
+            source={{ 
+              uri: user?.photoURL || 'https://via.placeholder.com/150/667eea/FFFFFF?text=User' 
+            }}
             style={styles.profileImage}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Walter White</Text>
-            <Text style={styles.profileEmail}>walterwhite@boardease.com</Text>
+            <Text style={styles.profileEmail}>{user?.email || 'No email'}</Text>
             <Text style={styles.profileType}>Landlord</Text>
           </View>
           <TouchableOpacity 
