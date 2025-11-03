@@ -13,25 +13,6 @@ export const GlobalListingContext = React.createContext({
 });
 
 export default function LandlordLayout() {
-  const handleLogout = () => {
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: () => {
-            router.replace('/');
-          }
-        }
-      ]
-    );
-  };
   const primaryColor = Colors.primary || '#667eea'; 
 
   // 1. Lift the listing state here
@@ -89,11 +70,6 @@ export default function LandlordLayout() {
           headerTitleStyle: {
             fontWeight: 'bold',
           },
-          headerRight: () => (
-            <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
-              <Feather name="log-out" size={24} color="#fff" />
-            </TouchableOpacity>
-          ),
         }}
       >
         {/* ... (Tabs.Screen components remain unchanged) ... */}
