@@ -1,8 +1,30 @@
 
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import { TouchableOpacity, Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Colors } from '../../constants/Colors';
 
 export default function LandlordLayout() {
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: () => {
+            router.replace('/');
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <Stack>
       <Stack.Screen
@@ -16,6 +38,11 @@ export default function LandlordLayout() {
           },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: 'bold' },
+          headerRight: () => (
+            <TouchableOpacity onPress={handleLogout} style={{ marginRight: 15 }}>
+              <Feather name="log-out" size={24} color="#fff" />
+            </TouchableOpacity>
+          ),
         }}
       />
       <Stack.Screen

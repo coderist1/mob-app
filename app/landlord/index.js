@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,33 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { boardingHouses } from '../../data/mockData';
+import { listingsStore } from '../../data/store';
+import { useListings } from '../../hooks/useListings';
 
 export default function LandlordPortal() {
-  const [listings, setListings] = useState(boardingHouses);
+  const listings = useListings();
+
+  const handleCreateListing = () => {
+    // In a real app, you'd navigate to a form and then add the result.
+    // For this demo, we'll create and add a new mock listing directly.
+    const newListing = {
+      id: `new-${Date.now()}`,
+      name: 'Newly Added Modern Condo',
+      price: 6000,
+      location: 'Kauswagan, Cagayan de Oro',
+      rating: 5.0,
+      reviews: 1,
+      images: ['https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400'],
+      floorPlans: [],
+      virtualTourUrl: null,
+      type: 'Studio Unit',
+      amenities: ['WiFi', 'Aircon', 'Kitchen', 'CR', 'Parking', '24/7 Security'],
+      distance: '1.5 km',
+      description: 'A brand new listing added by the landlord.',
+      landlord: { name: 'Landlord User', phone: '09123456789', verified: true }
+    };
+    listingsStore.addListing(newListing);
+  };
 
   const handleDeleteListing = (id) => {
     Alert.alert(
@@ -28,7 +51,7 @@ export default function LandlordPortal() {
         },
         { 
           text: "Delete", 
-          onPress: () => setListings(currentListings => currentListings.filter(listing => listing.id !== id)),
+          onPress: () => listingsStore.deleteListing(id),
           style: "destructive" 
         }
       ]
@@ -84,7 +107,7 @@ export default function LandlordPortal() {
 
       <View style={{ height: 40 }} />
       </ScrollView>
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/landlord/create-listing')}>
+      <TouchableOpacity style={styles.fab} onPress={handleCreateListing}>
         <Feather name="plus" size={24} color="#fff" />
       </TouchableOpacity>
     </View>

@@ -11,15 +11,16 @@ import {
   FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { boardingHouses } from '../../data/mockData';
 import FilterModal from '../../components/FilterModal';
 import BoardingHouseCard from '../../components/BoardingHouseCard';
 import SearchBar from '../../components/SearchBar';
+import { useListings } from '../../hooks/useListings';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeFilters, setActiveFilters] = useState(null);
+  const [isFilterModalVisible, setFilterModalVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(null); // This will hold the filter state object
+  const boardingHouses = useListings();
 
   const handleApplyFilters = (filters) => {
     setActiveFilters(filters);
@@ -75,7 +76,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={styles.header}> 
         <View style={styles.headerContent}>
           <Text style={styles.greeting}>Hello, Tenant!</Text>
           <Text style={styles.subGreeting}>Find your perfect boarding house</Text>
@@ -95,7 +96,7 @@ export default function Home() {
           />
           <TouchableOpacity 
             style={styles.filterButton}
-            onPress={() => setFilterModalVisible(true)}
+            onPress={() => setFilterModalVisible(true)} // Corrected state setter usage
           >
             <Ionicons name="filter" size={20} color="white" />
             {activeFilters && (
@@ -206,7 +207,7 @@ export default function Home() {
 
       {/* Filter Modal */}
       <FilterModal
-        visible={filterModalVisible}
+        visible={isFilterModalVisible}
         onClose={() => setFilterModalVisible(false)}
         onApplyFilters={handleApplyFilters}
         currentFilters={activeFilters}
