@@ -31,6 +31,7 @@ export default function LandlordLayout() {
         }
       ]
     );
+  };
   const primaryColor = Colors.primary || '#667eea'; 
 
   // 1. Lift the listing state here
