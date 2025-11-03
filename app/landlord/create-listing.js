@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react'; // ADDED: useContext
 import {
   View,
   Text,
@@ -10,11 +10,22 @@ import {
   Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router'; 
 import { Colors } from '../../constants/Colors';
 import PropertyImageGrid from '../../components/PropertyImageGrid';
+import { boardingHouses } from '../../data/mockData'; 
+import { GlobalListingContext } from './_layout'; // ADDED: Import context
 
 export default function CreateListing() {
+  const params = useLocalSearchParams(); 
+  // CRITICAL FIX: Get the update function from context
+  const { listings, updateListing } = useContext(GlobalListingContext); 
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [heading, setHeading] = useState('Create Property Listing');
+  const [submitText, setSubmitText] = useState('Create Listing');
+
+  // Existing form states
   const [title, setTitle] = useState('');
   const [address, setAddress] = useState('');
   const [rent, setRent] = useState('');
@@ -34,6 +45,34 @@ export default function CreateListing() {
   const [photos, setPhotos] = useState([]);
   const [floorPlans, setFloorPlans] = useState([]);
 
+  // Effect to load data if editing
+  useEffect(() => {
+    if (params.id) {
+      const listingId = params.id;
+      // CRITICAL FIX: Find the listing in the CONTEXT's current data, not the static mock data
+      const existingListing = listings.find(b => String(b.id) === listingId); 
+
+      if (existingListing) {
+        // Populate the form fields with existing data
+        setTitle(existingListing.name);
+        setAddress(existingListing.location);
+        setRent(String(existingListing.price)); 
+        setDescription(existingListing.details || ''); 
+        setAmenities(existingListing.amenities || {
+            parking: false, utilitiesIncluded: false, petsAllowed: false, 
+            wifi: false, furnished: false, 
+        });
+        setPhotos(existingListing.images || []);
+        
+        // Update states for editing mode
+        setIsEditing(true);
+        setHeading('Edit Property Listing');
+        setSubmitText('Update Listing');
+      }
+    }
+  }, [params.id, listings]); // Added 'listings' dependency to re-run if context data changes
+
+  // ... (pickImage, removeAt, toggleAmenity functions remain the same) ...
   const pickImage = async (setter, multiple = false) => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -50,7 +89,7 @@ export default function CreateListing() {
     }
   };
 
-  const removeAt = (arrSetter, idx) => (index) => {
+  const removeAt = (arrSetter) => (index) => {
     arrSetter((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -58,33 +97,48 @@ export default function CreateListing() {
     setAmenities((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+
   const validateAndSubmit = () => {
     if (!title.trim()) return Alert.alert('Validation', 'Title is required');
     if (!address.trim()) return Alert.alert('Validation', 'Address is required');
     if (!rent.trim() || isNaN(Number(rent))) return Alert.alert('Validation', 'Rent must be a number');
 
+    // Create a normalized payload
     const payload = {
-      title,
-      address,
-      rent: Number(rent),
-      description,
-      virtualTour,
+      // NOTE: Using a mock image array and details for a clean update
+      images: photos.length > 0 ? photos : ['https://via.placeholder.com/150/0000FF/808080?text=New+Listing'],
+      details: description, // Assuming 'details' is what the dashboard uses for description
+      location: address,
+      price: Number(rent),
+      name: title,
       amenities,
-      photos,
+      virtualTour,
       floorPlans,
     };
+    
+    if (isEditing) {
+      // CRITICAL FIX: Call the global update function
+      updateListing(params.id, payload);
+      console.log(`Updating listing ${params.id}`);
 
-    // TODO: Replace with API call to save listing
-    console.log('Listing payload:', payload);
-    Alert.alert('Success', 'Listing created (mock).', [
-      { text: 'OK', onPress: () => router.replace('/landlord') },
-    ]);
+      Alert.alert('Success', 'Listing updated successfully!', [
+        { text: 'OK', onPress: () => router.replace('/landlord') },
+      ]);
+    } else {
+      // CRITICAL FIX: For creation, use a temporary ID (like Date.now())
+      updateListing(null, payload);
+      console.log('Listing created');
+
+      Alert.alert('Success', 'Listing created successfully!', [
+        { text: 'OK', onPress: () => router.replace('/landlord') },
+      ]);
+    }
   };
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.heading}>Create Property Listing</Text>
+        <Text style={styles.heading}>{heading}</Text>
 
         <Text style={styles.label}>Title</Text>
         <TextInput style={styles.input} placeholder="e.g., Cozy 2BR near downtown" value={title} onChangeText={setTitle} />
@@ -150,7 +204,7 @@ export default function CreateListing() {
         />
 
         <TouchableOpacity style={styles.submitBtn} onPress={validateAndSubmit}>
-          <Text style={styles.submitText}>Create Listing</Text>
+          <Text style={styles.submitText}>{submitText}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

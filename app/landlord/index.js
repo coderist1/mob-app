@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useContext } from 'react'; // ADDED: useContext
 import {
   View,
   Text,
@@ -12,33 +11,13 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { listingsStore } from '../../data/store';
-import { useListings } from '../../hooks/useListings';
+// NOTE: We no longer import mockData, we use the context instead
+// import { boardingHouses } from '../../data/mockData'; 
+import { GlobalListingContext } from './_layout'; // ADDED: Import context
 
 export default function LandlordPortal() {
-  const listings = useListings();
-
-  const handleCreateListing = () => {
-    // In a real app, you'd navigate to a form and then add the result.
-    // For this demo, we'll create and add a new mock listing directly.
-    const newListing = {
-      id: `new-${Date.now()}`,
-      name: 'Newly Added Modern Condo',
-      price: 6000,
-      location: 'Kauswagan, Cagayan de Oro',
-      rating: 5.0,
-      reviews: 1,
-      images: ['https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400'],
-      floorPlans: [],
-      virtualTourUrl: null,
-      type: 'Studio Unit',
-      amenities: ['WiFi', 'Aircon', 'Kitchen', 'CR', 'Parking', '24/7 Security'],
-      distance: '1.5 km',
-      description: 'A brand new listing added by the landlord.',
-      landlord: { name: 'Landlord User', phone: '09123456789', verified: true }
-    };
-    listingsStore.addListing(newListing);
-  };
+  // CRITICAL FIX: Read data and functions from the global context
+  const { listings, deleteListing } = useContext(GlobalListingContext);
 
   const handleDeleteListing = (id) => {
     Alert.alert(
@@ -50,12 +29,17 @@ export default function LandlordPortal() {
           style: "cancel"
         },
         { 
+          // CRITICAL FIX: Use the deleteListing function from context
           text: "Delete", 
-          onPress: () => listingsStore.deleteListing(id),
+          onPress: () => deleteListing(id),
           style: "destructive" 
         }
       ]
     );
+  };
+  
+  const handleEditListing = (id) => {
+    router.push(`/landlord/edit-listing?id=${id}`);
   };
 
   return (
@@ -69,7 +53,8 @@ export default function LandlordPortal() {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Feather name="list" size={22} color={Colors.primary} />
-          <Text style={styles.statValue}>{listings.length}</Text>
+          {/* Use listings.length from context */}
+          <Text style={styles.statValue}>{listings.length}</Text> 
           <Text style={styles.statLabel}>Listings</Text>
         </View>
         <View style={styles.statCard}>
@@ -88,15 +73,18 @@ export default function LandlordPortal() {
       <View style={styles.listingsRow}>
         {listings.map((listing) => (
           <View key={listing.id} style={styles.card}>
-            <TouchableOpacity style={styles.cardClickable} onPress={() => router.push('/landlord/create-listing')}>
+            <View style={styles.cardClickable}>
               <Image source={{ uri: listing.images[0] }} style={styles.cardImage} />
               <View style={styles.cardBody}>
                 <Text style={styles.cardTitle} numberOfLines={1}>{listing.name}</Text>
                 <Text style={styles.cardSub} numberOfLines={1}>{listing.location}</Text>
                 <Text style={styles.cardPrice}>₱{listing.price.toLocaleString()}</Text>
               </View>
-            </TouchableOpacity>
+            </View>
             <View style={styles.cardActions}>
+              <TouchableOpacity style={styles.editButton} onPress={() => handleEditListing(listing.id)}>
+                <Feather name="edit" size={20} color={Colors.primary} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteListing(listing.id)}>
                 <Feather name="trash-2" size={20} color="#ef4444" />
               </TouchableOpacity>
@@ -107,7 +95,7 @@ export default function LandlordPortal() {
 
       <View style={{ height: 40 }} />
       </ScrollView>
-      <TouchableOpacity style={styles.fab} onPress={handleCreateListing}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/landlord/create-listing')}>
         <Feather name="plus" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
@@ -179,8 +167,16 @@ const styles = StyleSheet.create({
   cardSub: { color: '#777', marginTop: 4 },
   cardPrice: { marginTop: 8, color: Colors.primary, fontWeight: 'bold', fontSize: 16 },
   cardActions: {
-    justifyContent: 'center',
+    justifyContent: 'space-around', 
     paddingHorizontal: 16,
+    borderLeftWidth: 1, 
+    borderColor: '#f0f0f0',
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#e0f2fe', 
+    marginBottom: 4, 
   },
   deleteButton: {
     padding: 8,
