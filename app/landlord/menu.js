@@ -75,6 +75,7 @@ export default function LandlordMenuScreen() {
     );
   };
 
+<<<<<<< HEAD
   const menu = [
     // ... other items ...
     { icon: 'person-circle-outline', name: 'Profile', description: 'Manage your account information', screen: 'profile' }, // The item you want to target
@@ -88,6 +89,13 @@ export default function LandlordMenuScreen() {
     } else if (item.screen === 'inquiries') {
       router.push('/landlord/inquiries');
       } else {
+=======
+  const handleMenuPress = (item) => {
+    // Navigate to the specified screen. For tabs (like inquiries), we use the name.
+    if (item.screen === 'inquiries') {
+      router.push('/landlord/inquiries');
+    } else {
+>>>>>>> 7cb072196f57e2d24b9a1fe6317112d07071a163
       // For non-tab screens like profile or settings, you'd push to the full path.
       // e.g., router.push(`/landlord/${item.screen}`);
       console.log(`Navigating to ${item.screen}`);
