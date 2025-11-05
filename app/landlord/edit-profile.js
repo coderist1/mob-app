@@ -85,7 +85,7 @@ export default function EditLandlordProfile() {
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.container}>
       <View style={styles.card}>
-        <Text style={styles.heading}>Edit Your Public Profile</Text>
+        <Text style={styles.heading}>Edit Your Profile</Text>
         <Text style={styles.subtext}>This information will be visible to tenants viewing your listings.</Text>
         
         {/* Profile Picture Section */}
@@ -118,7 +118,7 @@ export default function EditLandlordProfile() {
           maxLength={300}
         />
 
-        <Text style={styles.label}>Public Contact Email</Text>
+        <Text style={styles.label}>Contact Email</Text>
         <TextInput 
           style={styles.input} 
           placeholder="Email for inquiries" 
@@ -128,7 +128,7 @@ export default function EditLandlordProfile() {
           autoCapitalize="none"
         />
 
-        <Text style={styles.label}>Public Contact Number (Optional)</Text>
+        <Text style={styles.label}>Contact Number (Optional)</Text>
         <TextInput 
           style={styles.input} 
           placeholder="Phone number for calls/SMS" 
