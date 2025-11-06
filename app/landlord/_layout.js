@@ -127,7 +127,12 @@ export default function LandlordLayout() {
             ),
           }}
         />
-        
+        <Tabs.Screen
+        name="edit-profile"
+        options={{
+          href: null,
+        }}
+      />
       </Tabs>
     </GlobalListingContext.Provider>
   );
