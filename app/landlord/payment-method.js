@@ -44,7 +44,7 @@ export default function PaymentMethodsScreen() {
     }, [])
   );
 
-    // Handle System Back Action
+  // Handle System Back Action
   useFocusEffect(
     useCallback(() => {
       
