@@ -2,6 +2,8 @@
 import React from 'react';
 import {
   View,
+  KeyboardAvoidingView,
+  Platform,
   Text,
   StyleSheet,
   ScrollView,
@@ -121,7 +123,10 @@ export default function Profile() {
   ];
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -279,7 +284,7 @@ export default function Profile() {
           </TouchableOpacity>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
