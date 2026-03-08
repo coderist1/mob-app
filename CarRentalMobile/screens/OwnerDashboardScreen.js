@@ -1,575 +1,506 @@
-import React, { useState } from 'react';
+// screens/OwnerDashboardScreen.js
+// Bottom nav: Home | Rentals | Add Vehicle | Log Book | Profile
+// Removed header action buttons — all navigation is via bottom bar
+
+import React, { useState, useMemo } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Modal, FlatList, Alert, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  Modal, StyleSheet, Alert, Platform, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useLogReport } from '../context/LogReportContext';
+import BottomNav from '../components/BottomNav';
 import ProfileAvatar from '../components/ProfileAvatar';
+import LogReportScreen from './LogReportScreen';
 
+/* ─── Design tokens ─── */
 const C = {
   primary:   '#3F9B84',
   primaryDk: '#2d7a67',
-  primaryLt: '#ecfdf5',
   navy:      '#1a2c5e',
   danger:    '#ef4444',
   warning:   '#f59e0b',
   success:   '#22c55e',
-  g50:   '#f9fafb',
-  g100:  '#f3f4f6',
-  g200:  '#e5e7eb',
-  g300:  '#d1d5db',
-  g400:  '#9ca3af',
-  g500:  '#6b7280',
-  g700:  '#374151',
-  g900:  '#111827',
+  g50:  '#f9fafb',
+  g100: '#f3f4f6',
+  g200: '#e5e7eb',
+  g300: '#d1d5db',
+  g400: '#9ca3af',
+  g500: '#6b7280',
+  g700: '#374151',
+  g900: '#111827',
   white: '#ffffff',
 };
 
-const VEHICLE_TYPES  = ['Sedan','SUV','Hatchback','Pickup','Van','MPV','Crossover'];
-const TRANSMISSIONS  = ['Automatic','Manual','CVT'];
-const FUEL_TYPES     = ['Gasoline','Diesel','Hybrid','Electric'];
-const LOCATIONS      = ['Manila','Quezon City','Cebu City','Davao City','Makati','Taguig','Pasig'];
-
-const INITIAL_VEHICLES = [
-  { id: '1', brand: 'Toyota', name: 'Vios',     year: 2022, type: 'Sedan', transmission: 'Automatic', fuel: 'Gasoline', seats: 5, pricePerDay: 1500, location: 'Manila',      status: 'available', available: true,  description: 'Reliable sedan for city trips.' },
-  { id: '2', brand: 'Honda',  name: 'Civic',    year: 2021, type: 'Sedan', transmission: 'CVT',       fuel: 'Gasoline', seats: 5, pricePerDay: 2000, location: 'Makati',      status: 'rented',    available: false, description: 'Sporty and fuel efficient.' },
-  { id: '3', brand: 'Ford',   name: 'Ranger',   year: 2023, type: 'Pickup', transmission: 'Automatic', fuel: 'Diesel',  seats: 5, pricePerDay: 3500, location: 'Davao City',  status: 'available', available: true,  description: 'Tough pickup for any terrain.' },
-];
-
-const INITIAL_RENTALS = [
-  { id: 'r1', vehicleId: '2', vehicleName: 'Honda Civic', renterName: 'Juan Dela Cruz', amount: 2000, status: 'active',   startDate: '2026-03-01', endDate: '2026-03-08' },
-  { id: 'r2', vehicleId: '1', vehicleName: 'Toyota Vios', renterName: 'Maria Santos',  amount: 1500, status: 'pending',  startDate: '2026-03-10', endDate: '2026-03-15' },
-];
-
-function StatusBadge({ status }) {
-  const map = {
-    available: { bg: '#d1fae5', color: '#065f46', border: '#6ee7b7', label: 'Available' },
-    rented:    { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5', label: 'Rented'    },
-    maintenance: { bg: '#fef3c7', color: '#92400e', border: '#fcd34d', label: 'Maintenance' },
-    pending:   { bg: '#fef3c7', color: '#d97706', border: '#fde68a', label: 'Pending'   },
-    active:    { bg: '#d1fae5', color: '#059669', border: '#6ee7b7', label: 'Active'    },
-    returned:  { bg: '#e5e7eb', color: '#6b7280', border: '#d1d5db', label: 'Returned'  },
-    rejected:  { bg: '#fee2e2', color: '#dc2626', border: '#fca5a5', label: 'Rejected'  },
-  };
-  const t = map[status] || map['available'];
-  return (
-    <View style={{ backgroundColor: t.bg, borderWidth: 1, borderColor: t.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-      <Text style={{ fontSize: 11, fontWeight: '700', color: t.color }}>{t.label}</Text>
-    </View>
-  );
-}
-
+/* ─── Vehicle Card ─── */
 function VehicleCard({ vehicle, onEdit, onDelete }) {
   return (
-    <View style={s.card}>
-      <View style={s.cardImgPlaceholder}>
-        <Text style={s.cardImgIcon}>🚗</Text>
+    <View style={s.vehicleCard}>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <Text style={s.vehicleName}>{vehicle.name || 'Unnamed Vehicle'}</Text>
+          <View style={[s.statusBadge, { backgroundColor: vehicle.status === 'available' ? '#d1fae5' : vehicle.status === 'rented' ? '#fee2e2' : '#fef3c7' }]}>
+            <Text style={[s.statusText, { color: vehicle.status === 'available' ? '#065f46' : vehicle.status === 'rented' ? '#991b1b' : '#92400e' }]}>
+              {(vehicle.status || 'available').charAt(0).toUpperCase() + (vehicle.status || 'available').slice(1)}
+            </Text>
+          </View>
+        </View>
+        <Text style={s.vehicleSub}>{vehicle.model || ''} {vehicle.year ? `· ${vehicle.year}` : ''}</Text>
+        {vehicle.pricePerDay && (
+          <Text style={s.vehiclePrice}>₱{parseFloat(vehicle.pricePerDay).toLocaleString()}/day</Text>
+        )}
       </View>
-      <View style={s.cardBody}>
-        <View style={s.cardRow}>
-          <Text style={s.cardTitle}>{vehicle.brand} {vehicle.name}</Text>
-          <StatusBadge status={vehicle.status} />
-        </View>
-        <Text style={s.cardMeta}>{vehicle.year} · {vehicle.type} · {vehicle.transmission}</Text>
-        <Text style={s.cardMeta}>📍 {vehicle.location}</Text>
-        <Text style={s.cardPrice}>₱{Number(vehicle.pricePerDay).toLocaleString()}<Text style={s.cardPriceSub}>/day</Text></Text>
-        <View style={s.cardActions}>
-          <TouchableOpacity style={s.btnOutline} onPress={() => onEdit(vehicle)}>
-            <Text style={s.btnOutlineText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.btnDanger} onPress={() => onDelete(vehicle.id)}>
-            <Text style={s.btnDangerText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TouchableOpacity onPress={() => onEdit(vehicle)} style={s.iconBtn}>
+          <Text style={{ fontSize: 15 }}>✏️</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => onDelete(vehicle.id)} style={[s.iconBtn, { borderColor: '#fecaca' }]}>
+          <Text style={{ fontSize: 15 }}>🗑</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-export default function OwnerDashboardScreen() {
-  const router = useRouter();
-  const { user, logout } = useAuth();
-  const [vehicles,    setVehicles]    = useState(INITIAL_VEHICLES);
-  const [rentals,     setRentals]     = useState(INITIAL_RENTALS);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal,  setShowAddModal]  = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showHistory,   setShowHistory]   = useState(false);
-  const [editTarget,    setEditTarget]    = useState(null);
-  const [formData, setFormData] = useState({
-    brand: '', name: '', year: String(new Date().getFullYear()),
-    type: 'Sedan', transmission: 'Automatic', fuel: 'Gasoline',
-    seats: '5', pricePerDay: '', location: 'Manila', status: 'available', description: '',
-  });
+/* ─── Vehicle Form ─── */
+function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
+  const blank = { name: '', model: '', year: '', pricePerDay: '', location: '', description: '', status: 'available', seats: '', fuel: '' };
+  const [form, setForm] = useState(initial || blank);
 
-  const setF = (k, v) => setFormData(p => ({ ...p, [k]: v }));
+  React.useEffect(() => { if (visible) setForm(initial || blank); }, [visible]);
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleSave = () => {
+    if (!form.name.trim()) { Alert.alert('Required', 'Vehicle name is required.'); return; }
+    if (!form.pricePerDay) { Alert.alert('Required', 'Price per day is required.'); return; }
+    onSave(form);
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={{ flex: 1, backgroundColor: C.white }}>
+        <View style={s.modalHeader}>
+          <Text style={s.modalTitle}>{isEdit ? 'Edit Vehicle' : 'Add New Vehicle'}</Text>
+          <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
+        </View>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+          {[
+            { key: 'name',        label: 'Vehicle Name *',   placeholder: 'e.g. Toyota Vios' },
+            { key: 'model',       label: 'Model',            placeholder: 'e.g. 1.3 E CVT' },
+            { key: 'year',        label: 'Year',             placeholder: 'e.g. 2022', numeric: true },
+            { key: 'pricePerDay', label: 'Price per Day (₱) *', placeholder: 'e.g. 2500', numeric: true },
+            { key: 'location',    label: 'Pickup Location',  placeholder: 'e.g. Davao City' },
+            { key: 'seats',       label: 'Seats',            placeholder: 'e.g. 5', numeric: true },
+            { key: 'fuel',        label: 'Fuel Type',        placeholder: 'e.g. Gasoline' },
+          ].map(f => (
+            <View key={f.key} style={{ marginBottom: 14 }}>
+              <Text style={s.fieldLabel}>{f.label}</Text>
+              <TextInput style={s.input} placeholder={f.placeholder} placeholderTextColor={C.g400}
+                value={String(form[f.key] || '')} onChangeText={v => set(f.key, v)}
+                keyboardType={f.numeric ? 'numeric' : 'default'} />
+            </View>
+          ))}
+          <View style={{ marginBottom: 14 }}>
+            <Text style={s.fieldLabel}>Description</Text>
+            <TextInput style={[s.input, { height: 80, textAlignVertical: 'top' }]} multiline
+              placeholder="Describe your vehicle…" placeholderTextColor={C.g400}
+              value={form.description} onChangeText={v => set('description', v)} />
+          </View>
+          <View style={{ marginBottom: 14 }}>
+            <Text style={s.fieldLabel}>Status</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {['available', 'unavailable'].map(st => (
+                <TouchableOpacity key={st} onPress={() => set('status', st)}
+                  style={[s.pillBtn, form.status === st && { backgroundColor: C.primary, borderColor: C.primary }]}>
+                  <Text style={[s.pillBtnText, form.status === st && { color: C.white }]}>
+                    {st.charAt(0).toUpperCase() + st.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <TouchableOpacity onPress={handleSave} style={s.btnPrimary}>
+            <Text style={s.btnPrimaryText}>{isEdit ? 'Save Changes' : 'Add Vehicle'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+/* ─── Rental History Tab ─── */
+function RentalsTab({ rentalHistory, vehicles }) {
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    let list = rentalHistory;
+    if (filter !== 'all') list = list.filter(r => r.status === filter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(r =>
+        r.vehicleName?.toLowerCase().includes(q) ||
+        r.renterName?.toLowerCase().includes(q)
+      );
+    }
+    return list.slice().reverse();
+  }, [rentalHistory, filter, search]);
+
+  const stats = useMemo(() => ({
+    total:    rentalHistory.length,
+    pending:  rentalHistory.filter(r => r.status === 'pending').length,
+    approved: rentalHistory.filter(r => r.status === 'approved').length,
+    completed:rentalHistory.filter(r => r.status === 'completed').length,
+  }), [rentalHistory]);
+
+  const TABS = ['all', 'pending', 'approved', 'completed', 'rejected'];
+  const BADGE_COLORS = {
+    pending:  { bg: '#fef3c7', color: '#92400e' },
+    approved: { bg: '#d1fae5', color: '#065f46' },
+    completed:{ bg: '#dbeafe', color: '#1e40af' },
+    rejected: { bg: '#fee2e2', color: '#991b1b' },
+  };
+
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Stats */}
+      <View style={{ flexDirection: 'row', gap: 8, padding: 16, paddingBottom: 0 }}>
+        {[
+          { label: 'Total',    value: stats.total,    color: C.primary },
+          { label: 'Pending',  value: stats.pending,  color: C.warning },
+          { label: 'Active',   value: stats.approved, color: C.success },
+          { label: 'Done',     value: stats.completed,color: '#3b82f6' },
+        ].map(st => (
+          <View key={st.label} style={{ flex: 1, backgroundColor: C.white, borderRadius: 10, padding: 10, borderLeftWidth: 3, borderLeftColor: st.color, elevation: 2 }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: st.color }}>{st.value}</Text>
+            <Text style={{ fontSize: 10, color: C.g500 }}>{st.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Filter tabs */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {TABS.map(t => (
+            <TouchableOpacity key={t} onPress={() => setFilter(t)}
+              style={[s.filterTab, filter === t && s.filterTabActive]}>
+              <Text style={[s.filterTabText, filter === t && s.filterTabTextActive]}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Search */}
+      <View style={[s.searchWrap, { marginHorizontal: 16, marginBottom: 12 }]}>
+        <Text style={s.searchIcon}>🔍</Text>
+        <TextInput style={s.searchInput} placeholder="Search rentals…" placeholderTextColor={C.g400} value={search} onChangeText={setSearch} />
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingTop: 0, paddingBottom: 100 }}>
+        {filtered.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={{ fontSize: 40, marginBottom: 10 }}>📭</Text>
+            <Text style={s.emptyTitle}>No rentals found</Text>
+          </View>
+        ) : (
+          filtered.map((rental, i) => {
+            const bc = BADGE_COLORS[rental.status] || BADGE_COLORS.pending;
+            return (
+              <View key={rental.id || i} style={s.rentalCard}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.navy, flex: 1 }}>{rental.vehicleName || 'Vehicle'}</Text>
+                  <View style={{ backgroundColor: bc.bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: bc.color }}>{(rental.status || 'pending').toUpperCase()}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, color: C.g500 }}>Renter: <Text style={{ color: C.g700, fontWeight: '600' }}>{rental.renterName || '—'}</Text></Text>
+                <Text style={{ fontSize: 13, color: C.g500, marginTop: 2 }}>Period: <Text style={{ color: C.g700 }}>{fmtDate(rental.startDate)} – {fmtDate(rental.endDate)}</Text></Text>
+                {rental.totalPrice && <Text style={{ fontSize: 13, color: C.primary, fontWeight: '700', marginTop: 4 }}>₱{parseFloat(rental.totalPrice).toLocaleString()}</Text>}
+
+                {/* Approve / Reject for pending */}
+                {rental.status === 'pending' && (
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity style={[s.btnPrimary, { flex: 1, paddingVertical: 9 }]}
+                      onPress={() => Alert.alert('Approve', `Approve rental for ${rental.vehicleName}?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Approve', onPress: () => { rental.status = 'approved'; } },
+                      ])}>
+                      <Text style={[s.btnPrimaryText, { fontSize: 13 }]}>✓ Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.btnDanger, { flex: 1, paddingVertical: 9 }]}
+                      onPress={() => Alert.alert('Reject', `Reject this rental request?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Reject', style: 'destructive', onPress: () => { rental.status = 'rejected'; } },
+                      ])}>
+                      <Text style={[s.btnPrimaryText, { fontSize: 13 }]}>✕ Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ═══════════ HOME TAB ═══════════ */
+function HomeTab({ vehicles, stats, searchQuery, setSearchQuery, filtered, onEdit, onDelete }) {
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* Stats row */}
+      <View style={s.statsRow}>
+        {[
+          { label: 'Total',     value: stats.total,                                 color: C.primary },
+          { label: 'Available', value: stats.available,                              color: C.success },
+          { label: 'Rented',    value: stats.rented,                                 color: C.danger  },
+          { label: 'Est./Day',  value: `₱${stats.earnings.toLocaleString()}`,        color: C.navy    },
+        ].map(st => (
+          <View key={st.label} style={s.statCard}>
+            <Text style={[s.statNum, { color: st.color }]}>{st.value}</Text>
+            <Text style={s.statLabel}>{st.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Search */}
+      <View style={[s.searchWrap, { marginHorizontal: 16 }]}>
+        <Text style={s.searchIcon}>🔍</Text>
+        <TextInput style={s.searchInput} placeholder="Search your vehicles…" placeholderTextColor={C.g400}
+          value={searchQuery} onChangeText={setSearchQuery} />
+      </View>
+
+      {/* Vehicle list */}
+      <View style={{ paddingHorizontal: 16 }}>
+        {filtered.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={s.emptyTitle}>No vehicles found</Text>
+            <Text style={s.emptySub}>Tap the "+" tab below to add your first car.</Text>
+          </View>
+        ) : (
+          filtered.map(v => <VehicleCard key={v.id} vehicle={v} onEdit={onEdit} onDelete={onDelete} />)
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+/* ═══════════ MAIN COMPONENT ═══════════ */
+export default function OwnerDashboardScreen() {
+  const router  = useRouter();
+  const { user } = useAuth();
+  const { reports } = useLogReport();
+
+  const [activeTab, setActiveTab] = useState('home');
+
+  // Vehicle state
+  const [vehicles, setVehicles]       = useState([
+    { id: 1, name: 'Toyota Vios', model: '1.3 E', year: '2022', pricePerDay: '2500', status: 'available', location: 'Davao City', seats: '5', fuel: 'Gasoline' },
+    { id: 2, name: 'Honda City', model: '1.5 RS', year: '2021', pricePerDay: '3000', status: 'rented',    location: 'Davao City', seats: '5', fuel: 'Gasoline' },
+  ]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal]   = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTarget, setEditTarget]       = useState(null);
+
+  // Rental history (demo data)
+  const [rentalHistory] = useState([
+    { id: 'r1', vehicleId: 2, vehicleName: 'Honda City', renterName: 'Juan Dela Cruz', startDate: '2026-03-01', endDate: '2026-03-05', totalPrice: 15000, status: 'approved' },
+    { id: 'r2', vehicleId: 1, vehicleName: 'Toyota Vios', renterName: 'Maria Santos',   startDate: '2026-02-15', endDate: '2026-02-20', totalPrice: 12500, status: 'completed' },
+    { id: 'r3', vehicleId: 1, vehicleName: 'Toyota Vios', renterName: 'Pedro Reyes',    startDate: '2026-03-10', endDate: '2026-03-12', totalPrice: 5000,  status: 'pending' },
+  ]);
 
   const userName = user?.firstName || user?.fullName || 'Owner';
 
-  const stats = {
+  const stats = useMemo(() => ({
     total:     vehicles.length,
-    available: vehicles.filter(v => v.available).length,
-    rented:    vehicles.filter(v => !v.available).length,
-    earnings:  vehicles.filter(v => !v.available).reduce((s, v) => s + Number(v.pricePerDay || 0), 0),
-  };
+    available: vehicles.filter(v => v.status === 'available').length,
+    rented:    vehicles.filter(v => v.status === 'rented').length,
+    earnings:  vehicles.reduce((acc, v) => acc + (parseFloat(v.pricePerDay) || 0), 0),
+  }), [vehicles]);
 
-  const filtered = vehicles.filter(v => {
-    if (!searchQuery) return true;
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return vehicles;
     const q = searchQuery.toLowerCase();
-    return v.name.toLowerCase().includes(q) || v.brand.toLowerCase().includes(q) ||
-           v.type.toLowerCase().includes(q)  || v.location.toLowerCase().includes(q);
-  });
+    return vehicles.filter(v => v.name?.toLowerCase().includes(q) || v.model?.toLowerCase().includes(q));
+  }, [vehicles, searchQuery]);
 
-  const resetForm = () => setFormData({
-    brand: '', name: '', year: String(new Date().getFullYear()),
-    type: 'Sedan', transmission: 'Automatic', fuel: 'Gasoline',
-    seats: '5', pricePerDay: '', location: 'Manila', status: 'available', description: '',
-  });
+  // Pending badge for rentals tab
+  const pendingCount = rentalHistory.filter(r => r.status === 'pending').length;
 
-  const handleAdd = () => {
-    if (!formData.brand || !formData.name || !formData.pricePerDay) {
-      Alert.alert('Missing Fields', 'Brand, Model and Price are required.'); return;
+  const openEdit = v => { setEditTarget(v); setShowEditModal(true); };
+
+  const handleAdd = form => {
+    const newV = { ...form, id: Date.now() };
+    setVehicles(prev => [...prev, newV]);
+    setShowAddModal(false);
+  };
+
+  const handleEdit = form => {
+    setVehicles(prev => prev.map(v => v.id === editTarget.id ? { ...v, ...form } : v));
+    setShowEditModal(false);
+    setEditTarget(null);
+  };
+
+  const handleDelete = id => {
+    Alert.alert('Delete Vehicle?', 'This will permanently remove the vehicle listing.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => setVehicles(prev => prev.filter(v => v.id !== id)) },
+    ]);
+  };
+
+  const handleTabPress = tab => {
+    if (tab === 'add') { setShowAddModal(true); return; }
+    setActiveTab(tab);
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'home':
+        return (
+          <HomeTab
+            vehicles={vehicles}
+            stats={stats}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            filtered={filtered}
+            onEdit={openEdit}
+            onDelete={handleDelete}
+          />
+        );
+      case 'rentals':
+        return <RentalsTab rentalHistory={rentalHistory} vehicles={vehicles} />;
+      case 'logbook':
+        return <LogReportScreen />;
+      case 'profile':
+        router.push('/profile');
+        return null;
+      default:
+        return null;
     }
-    const newV = {
-      ...formData,
-      id: String(Date.now()),
-      year: Number(formData.year),
-      seats: Number(formData.seats),
-      pricePerDay: Number(formData.pricePerDay),
-      available: formData.status === 'available',
-    };
-    Alert.alert('Add Vehicle', `List "${formData.brand} ${formData.name}" for rent?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Yes, Add', onPress: () => { setVehicles(p => [...p, newV]); resetForm(); setShowAddModal(false); } },
-    ]);
   };
-
-  const handleEdit = () => {
-    if (!editTarget) return;
-    const updated = {
-      ...editTarget, ...formData,
-      year: Number(formData.year),
-      seats: Number(formData.seats),
-      pricePerDay: Number(formData.pricePerDay),
-      available: formData.status === 'available',
-    };
-    Alert.alert('Save Changes', `Save changes to "${formData.brand} ${formData.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Yes, Save', onPress: () => {
-        setVehicles(p => p.map(v => v.id === editTarget.id ? updated : v));
-        setShowEditModal(false); setEditTarget(null); resetForm();
-      }},
-    ]);
-  };
-
-  const handleDelete = (id) => {
-    Alert.alert('Delete Vehicle', 'Are you sure? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setVehicles(p => p.filter(v => v.id !== id)) },
-    ]);
-  };
-
-  const openEdit = (v) => {
-    setEditTarget(v);
-    setFormData({
-      brand: v.brand, name: v.name, year: String(v.year),
-      type: v.type, transmission: v.transmission, fuel: v.fuel,
-      seats: String(v.seats), pricePerDay: String(v.pricePerDay),
-      location: v.location, status: v.status, description: v.description || '',
-    });
-    setShowEditModal(true);
-  };
-
-  const handleApprove = (id) => {
-    setRentals(p => p.map(r => r.id === id ? { ...r, status: 'active' } : r));
-    const r = rentals.find(r2 => r2.id === id);
-    if (r) setVehicles(p => p.map(v => v.id === r.vehicleId ? { ...v, available: false, status: 'rented' } : v));
-  };
-
-  const handleReject = (id) => {
-    setRentals(p => p.map(r => r.id === id ? { ...r, status: 'rejected' } : r));
-  };
-
-  // ── Reusable form (shared Add/Edit) ──
-  const renderVehicleForm = (onSubmit, isEdit) => (
-    <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
-      <Text style={s.modalSectionHead}>Basic Info</Text>
-      <View style={s.row2}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={s.label}>Brand *</Text>
-          <TextInput style={s.input} placeholder="Toyota" placeholderTextColor={C.g400} value={formData.brand} onChangeText={v => setF('brand', v)} />
-        </View>
-        <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={s.label}>Model *</Text>
-          <TextInput style={s.input} placeholder="Vios" placeholderTextColor={C.g400} value={formData.name} onChangeText={v => setF('name', v)} />
-        </View>
-      </View>
-
-      <View style={s.row2}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={s.label}>Year</Text>
-          <TextInput style={s.input} keyboardType="numeric" value={formData.year} onChangeText={v => setF('year', v)} />
-        </View>
-        <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={s.label}>Seats</Text>
-          <TextInput style={s.input} keyboardType="numeric" value={formData.seats} onChangeText={v => setF('seats', v)} />
-        </View>
-      </View>
-
-      <Text style={s.modalSectionHead}>Specifications</Text>
-      <Text style={s.label}>Vehicle Type</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-        {VEHICLE_TYPES.map(t => (
-          <TouchableOpacity key={t} style={[s.chip, formData.type === t && s.chipActive]} onPress={() => setF('type', t)}>
-            <Text style={[s.chipText, formData.type === t && s.chipTextActive]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <Text style={s.label}>Transmission</Text>
-      <View style={s.chipRow}>
-        {TRANSMISSIONS.map(t => (
-          <TouchableOpacity key={t} style={[s.chip, formData.transmission === t && s.chipActive]} onPress={() => setF('transmission', t)}>
-            <Text style={[s.chipText, formData.transmission === t && s.chipTextActive]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={s.label}>Fuel Type</Text>
-      <View style={s.chipRow}>
-        {FUEL_TYPES.map(f => (
-          <TouchableOpacity key={f} style={[s.chip, formData.fuel === f && s.chipActive]} onPress={() => setF('fuel', f)}>
-            <Text style={[s.chipText, formData.fuel === f && s.chipTextActive]}>{f}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={s.modalSectionHead}>Pricing & Location</Text>
-      <Text style={s.label}>Price per Day (₱) *</Text>
-      <TextInput style={[s.input, { marginBottom: 14 }]} placeholder="e.g. 2500" placeholderTextColor={C.g400}
-        keyboardType="numeric" value={formData.pricePerDay} onChangeText={v => setF('pricePerDay', v)} />
-
-      <Text style={s.label}>Location</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-        {LOCATIONS.map(l => (
-          <TouchableOpacity key={l} style={[s.chip, formData.location === l && s.chipActive]} onPress={() => setF('location', l)}>
-            <Text style={[s.chipText, formData.location === l && s.chipTextActive]}>{l}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      <Text style={s.label}>Status</Text>
-      <View style={s.chipRow}>
-        {['available', 'rented', 'maintenance'].map(st => (
-          <TouchableOpacity key={st} style={[s.chip, formData.status === st && s.chipActive]} onPress={() => setF('status', st)}>
-            <Text style={[s.chipText, formData.status === st && s.chipTextActive, { textTransform: 'capitalize' }]}>{st}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={s.label}>Description</Text>
-      <TextInput style={[s.input, { height: 80, textAlignVertical: 'top', marginBottom: 24 }]}
-        placeholder="Briefly describe the vehicle…" placeholderTextColor={C.g400} multiline
-        value={formData.description} onChangeText={v => setF('description', v)} />
-
-      <TouchableOpacity style={s.btn} onPress={onSubmit} activeOpacity={0.85}>
-        <Text style={s.btnText}>{isEdit ? 'Save Changes' : 'Add Vehicle'}</Text>
-      </TouchableOpacity>
-      <View style={{ height: 40 }} />
-    </ScrollView>
-  );
 
   return (
     <View style={{ flex: 1, backgroundColor: '#edf1f7' }}>
-
       {/* ── HEADER ── */}
       <View style={s.header}>
-        <View style={{ flex: 1 }}>
+        <View>
           <Text style={s.headerTitle}>Owner Dashboard</Text>
           <Text style={s.headerSub}>Welcome back, {userName} 👋</Text>
         </View>
-        <View style={s.headerActions}>
-          <TouchableOpacity style={s.headerBtn} onPress={() => setShowHistory(true)}>
-            <Text style={s.headerBtnText}>📋 Rentals</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.headerBtnPrimary} onPress={() => { resetForm(); setShowAddModal(true); }}>
-            <Text style={s.headerBtnPrimaryText}>+ Add</Text>
-          </TouchableOpacity>
-          <ProfileAvatar size={38} />
-        </View>
+        <ProfileAvatar size={38} />
       </View>
 
-      <ScrollView style={{ flex: 1 }}>
+      {/* ── CONTENT ── */}
+      <View style={{ flex: 1 }}>
+        {renderContent()}
+      </View>
 
-        {/* ── STATS ── */}
-        <View style={s.statsRow}>
-          {[
-            { label: 'Total',     value: stats.total,                                  color: C.primary },
-            { label: 'Available', value: stats.available,                               color: C.success },
-            { label: 'Rented',    value: stats.rented,                                  color: C.danger  },
-            { label: 'Est./Day',  value: `₱${stats.earnings.toLocaleString()}`,         color: C.navy    },
-          ].map(st => (
-            <View key={st.label} style={s.statCard}>
-              <Text style={[s.statNum, { color: st.color }]}>{st.value}</Text>
-              <Text style={s.statLabel}>{st.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* ── SEARCH ── */}
-        <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>🔍</Text>
-          <TextInput style={s.searchInput} placeholder="Search your vehicles…" placeholderTextColor={C.g400}
-            value={searchQuery} onChangeText={setSearchQuery} />
-        </View>
-
-        {/* ── VEHICLE LIST ── */}
-        <View style={{ paddingHorizontal: 16, paddingBottom: 32 }}>
-          {filtered.length === 0 ? (
-            <View style={s.empty}>
-              <Text style={s.emptyTitle}>No vehicles found</Text>
-              <Text style={s.emptySub}>Tap "+ Add" to list your first car for rent.</Text>
-            </View>
-          ) : (
-            filtered.map(v => (
-              <VehicleCard key={v.id} vehicle={v} onEdit={openEdit} onDelete={handleDelete} />
-            ))
-          )}
-        </View>
-      </ScrollView>
+      {/* ── BOTTOM NAV ── */}
+      <BottomNav
+        role="owner"
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
+        badges={{ rentals: pendingCount }}
+      />
 
       {/* ── ADD MODAL ── */}
-      <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={s.modalContainer}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Add New Vehicle</Text>
-            <TouchableOpacity onPress={() => { setShowAddModal(false); resetForm(); }}>
-              <Text style={s.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ flex: 1, padding: 20 }}>
-            {renderVehicleForm(handleAdd, false)}
-          </View>
-        </View>
-      </Modal>
+      <VehicleFormModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={handleAdd}
+        initial={null}
+        isEdit={false}
+      />
 
       {/* ── EDIT MODAL ── */}
-      <Modal visible={showEditModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={s.modalContainer}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Edit Vehicle</Text>
-            <TouchableOpacity onPress={() => { setShowEditModal(false); setEditTarget(null); resetForm(); }}>
-              <Text style={s.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{ flex: 1, padding: 20 }}>
-            {renderVehicleForm(handleEdit, true)}
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── RENTAL HISTORY MODAL ── */}
-      <Modal visible={showHistory} animationType="slide" presentationStyle="pageSheet">
-        <View style={s.modalContainer}>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Rental History</Text>
-            <TouchableOpacity onPress={() => setShowHistory(false)}>
-              <Text style={s.modalClose}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={{ flex: 1, padding: 20 }}>
-            {rentals.length === 0 ? (
-              <Text style={s.emptySub}>No rental history yet.</Text>
-            ) : (
-              rentals.slice().reverse().map(r => (
-                <View key={r.id} style={s.rentalItem}>
-                  <View style={s.rentalHeader}>
-                    <Text style={s.rentalVehicle}>{r.vehicleName}</Text>
-                    <StatusBadge status={r.status} />
-                  </View>
-                  <Text style={s.rentalMeta}>Renter: {r.renterName} · ₱{r.amount}/day</Text>
-                  <Text style={s.rentalDates}>
-                    {new Date(r.startDate).toLocaleDateString()} → {r.endDate ? new Date(r.endDate).toLocaleDateString() : 'Ongoing'}
-                  </Text>
-                  {r.status === 'pending' && (
-                    <View style={s.rentalActions}>
-                      <TouchableOpacity style={s.btnApprove} onPress={() => handleApprove(r.id)}>
-                        <Text style={s.btnApproveText}>Approve</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={s.btnDanger} onPress={() => handleReject(r.id)}>
-                        <Text style={s.btnDangerText}>Reject</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-
+      <VehicleFormModal
+        visible={showEditModal}
+        onClose={() => { setShowEditModal(false); setEditTarget(null); }}
+        onSave={handleEdit}
+        initial={editTarget}
+        isEdit
+      />
     </View>
   );
 }
 
+/* ─── Styles ─── */
 const s = StyleSheet.create({
-  /* header */
   header: {
-    backgroundColor: C.white,
-    paddingTop: 52,
-    paddingBottom: 16,
+    backgroundColor: C.navy,
+    paddingTop: Platform.OS === 'ios' ? 56 : 44,
+    paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: C.g200,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 3,
   },
-  headerTitle:   { fontSize: 20, fontWeight: '800', color: C.navy },
-  headerSub:     { fontSize: 12, color: C.g400, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerBtn: {
-    borderWidth: 1.5, borderColor: C.g200, borderRadius: 8,
-    paddingHorizontal: 12, paddingVertical: 7,
-    backgroundColor: C.white,
+  headerTitle: { fontSize: 22, fontWeight: '800', color: C.white },
+  headerSub:   { fontSize: 13, color: 'rgba(255,255,255,.65)', marginTop: 2 },
+  statsRow:    { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 16, gap: 8 },
+  statCard:    { flex: 1, backgroundColor: C.white, borderRadius: 12, padding: 12, alignItems: 'center', elevation: 2 },
+  statNum:     { fontSize: 20, fontWeight: '800' },
+  statLabel:   { fontSize: 11, color: C.g500, marginTop: 3 },
+  searchWrap:  { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 10, borderWidth: 1, borderColor: C.g200, paddingHorizontal: 12, marginBottom: 14 },
+  searchIcon:  { fontSize: 14, marginRight: 8 },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: C.g900 },
+  vehicleCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: C.white,
+    borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: C.g200, elevation: 2,
   },
-  headerBtnText:    { fontSize: 12, fontWeight: '600', color: C.g700 },
-  headerBtnPrimary: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  headerBtnPrimaryText: { fontSize: 13, fontWeight: '700', color: C.white },
-  logoutBtn: { fontSize: 12, color: C.danger, fontWeight: '600', marginLeft: 4 },
-
-  /* stats */
-  statsRow: { flexDirection: 'row', padding: 16, gap: 10 },
-  statCard: {
-    flex: 1,
-    backgroundColor: C.white,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+  vehicleName:  { fontSize: 15, fontWeight: '700', color: C.navy },
+  vehicleSub:   { fontSize: 12, color: C.g500, marginTop: 2 },
+  vehiclePrice: { fontSize: 13, color: C.primary, fontWeight: '700', marginTop: 4 },
+  statusBadge:  { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  statusText:   { fontSize: 10, fontWeight: '700' },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 8, backgroundColor: C.g50,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.g200,
   },
-  statNum:   { fontSize: 20, fontWeight: '800', lineHeight: 24 },
-  statLabel: { fontSize: 10, color: C.g500, marginTop: 3, textAlign: 'center' },
-
-  /* search */
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.white,
-    marginHorizontal: 16,
-    marginBottom: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: C.g200,
-    paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+  rentalCard: {
+    backgroundColor: C.white, borderRadius: 12, padding: 14,
+    marginBottom: 10, borderWidth: 1, borderColor: C.g200, elevation: 2,
   },
-  searchIcon:  { fontSize: 16, marginRight: 8 },
-  searchInput: { flex: 1, paddingVertical: 12, fontSize: 14, color: C.navy },
-
-  /* vehicle card */
-  card: {
-    backgroundColor: C.white,
-    borderRadius: 16,
-    marginBottom: 14,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+  filterTab: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8,
+    backgroundColor: C.white, borderWidth: 1, borderColor: C.g200,
   },
-  cardImgPlaceholder: {
-    backgroundColor: C.g100,
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
+  filterTabActive:     { backgroundColor: C.primary, borderColor: C.primary },
+  filterTabText:       { fontSize: 13, color: C.g500 },
+  filterTabTextActive: { color: C.white, fontWeight: '700' },
+  empty: {
+    alignItems: 'center', padding: 48, backgroundColor: C.g50,
+    borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: C.g200,
   },
-  cardImgIcon: { fontSize: 52 },
-  cardBody:    { padding: 16 },
-  cardRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  cardTitle:   { fontSize: 16, fontWeight: '800', color: C.navy, flex: 1, marginRight: 8 },
-  cardMeta:    { fontSize: 12, color: C.g500, marginBottom: 3 },
-  cardPrice:   { fontSize: 18, fontWeight: '800', color: C.primary, marginTop: 8, marginBottom: 12 },
-  cardPriceSub:{ fontSize: 13, fontWeight: '500', color: C.g400 },
-  cardActions: { flexDirection: 'row', gap: 10 },
-  btnOutline: {
-    flex: 1, borderWidth: 1.5, borderColor: C.primary, borderRadius: 8,
-    paddingVertical: 9, alignItems: 'center',
-  },
-  btnOutlineText: { color: C.primary, fontWeight: '700', fontSize: 13 },
-  btnDanger: {
-    flex: 1, backgroundColor: '#fef2f2', borderWidth: 1.5,
-    borderColor: '#fca5a5', borderRadius: 8, paddingVertical: 9, alignItems: 'center',
-  },
-  btnDangerText: { color: C.danger, fontWeight: '700', fontSize: 13 },
-  btnApprove: {
-    flex: 1, backgroundColor: C.primary, borderRadius: 8,
-    paddingVertical: 9, alignItems: 'center',
-  },
-  btnApproveText: { color: C.white, fontWeight: '700', fontSize: 13 },
-
-  /* empty */
-  empty:     { alignItems: 'center', padding: 48, backgroundColor: C.white, borderRadius: 16, borderWidth: 1.5, borderColor: C.g200, borderStyle: 'dashed' },
-  emptyTitle:{ fontSize: 17, fontWeight: '700', color: C.g700, marginBottom: 6 },
-  emptySub:  { fontSize: 13, color: C.g400, textAlign: 'center' },
-
-  /* modal */
-  modalContainer: { flex: 1, backgroundColor: C.white },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
-    borderBottomWidth: 1, borderBottomColor: C.g200,
-  },
-  modalTitle:       { fontSize: 18, fontWeight: '800', color: C.navy },
-  modalClose:       { fontSize: 20, color: C.g500, fontWeight: '700' },
-  modalSectionHead: {
-    fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8,
-    color: C.g500, marginBottom: 12, marginTop: 4, paddingBottom: 8,
-    borderBottomWidth: 1, borderBottomColor: C.g100,
-  },
-
-  /* form */
-  row2:  { flexDirection: 'row', marginBottom: 0 },
-  label: { fontSize: 13, fontWeight: '600', color: C.g700, marginBottom: 6 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: C.g700, marginBottom: 6 },
+  emptySub:   { fontSize: 13, color: C.g400, textAlign: 'center' },
+  // Modal
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: C.g200 },
+  modalTitle:  { fontSize: 18, fontWeight: '700', color: C.navy },
+  modalClose:  { fontSize: 22, color: C.g400 },
+  // Form
+  fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.g400, marginBottom: 6 },
   input: {
-    backgroundColor: C.g50, borderWidth: 1.5, borderColor: C.g200,
-    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: C.navy, marginBottom: 14,
+    padding: 12, borderWidth: 1.5, borderColor: C.g200, borderRadius: 10,
+    fontSize: 14, color: C.g900, backgroundColor: C.white,
   },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5,
-    borderColor: C.g200, borderRadius: 999, backgroundColor: C.white,
+  pillBtn:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: C.g200, backgroundColor: C.white },
+  pillBtnText: { fontSize: 13, fontWeight: '600', color: C.g500 },
+  btnPrimary: {
+    backgroundColor: C.primary, borderRadius: 10, paddingVertical: 13,
+    paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center',
   },
-  chipActive:    { borderColor: C.primary, backgroundColor: C.primaryLt },
-  chipText:      { fontSize: 13, color: C.g500, fontWeight: '500' },
-  chipTextActive:{ color: C.primary, fontWeight: '700' },
-  btn: {
-    backgroundColor: C.primary, borderRadius: 12, paddingVertical: 15,
-    alignItems: 'center', shadowColor: C.primary, shadowOpacity: 0.3,
-    shadowRadius: 8, elevation: 4,
+  btnPrimaryText: { color: C.white, fontSize: 14, fontWeight: '700' },
+  btnDanger: {
+    backgroundColor: C.danger, borderRadius: 10, paddingVertical: 13,
+    paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center',
   },
-  btnText: { color: C.white, fontSize: 16, fontWeight: '700' },
-
-  /* rentals */
-  rentalItem: {
-    backgroundColor: C.g50, borderWidth: 1.5, borderColor: C.g200,
-    borderRadius: 12, padding: 16, marginBottom: 12,
-  },
-  rentalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  rentalVehicle: { fontSize: 15, fontWeight: '700', color: C.navy, flex: 1, marginRight: 8 },
-  rentalMeta:    { fontSize: 13, color: C.g500, marginBottom: 3 },
-  rentalDates:   { fontSize: 12, color: C.g400, marginBottom: 10 },
-  rentalActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
 });
