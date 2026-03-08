@@ -219,7 +219,7 @@ function HomeTab({ userName, vehicles, myRentals }) {
       <View style={{ padding: 16 }}>
         {/* Search */}
         <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>🔍</Text>
+          
           <TextInput style={s.searchInput} placeholder="Search vehicles, location…" placeholderTextColor={C.g400} value={search} onChangeText={setSearch} />
         </View>
 
@@ -323,7 +323,7 @@ function BookingsTab() {
 
       {/* Search */}
       <View style={[s.searchWrap, { marginHorizontal: 16, marginBottom: 12 }]}>
-        <Text style={s.searchIcon}>🔍</Text>
+        
         <TextInput style={s.searchInput} placeholder="Search bookings…" placeholderTextColor={C.g400} value={search} onChangeText={setSearch} />
       </View>
 
@@ -388,7 +388,7 @@ export default function RenterDashboardScreen() {
     switch (activeTab) {
       case 'home':     return <HomeTab userName={userName} vehicles={DEMO_VEHICLES} myRentals={myRentals} />;
       case 'bookings': return <BookingsTab />;
-      case 'logbook':  return <LogReportScreen />;
+      case 'logreport': return <LogReportScreen />;
       default:         return null;
     }
   };
@@ -402,7 +402,7 @@ export default function RenterDashboardScreen() {
       <View style={s.header}>
         <View>
           <Text style={s.headerTitle}>Renter Dashboard</Text>
-          <Text style={s.headerSub}>Welcome back, {userName} 👋</Text>
+          <Text style={s.headerSub}>Welcome back, {userName}</Text>
         </View>
         <ProfileAvatar size={38} />
       </View>
