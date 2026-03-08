@@ -1,0 +1,5 @@
+// app/index.js  –  redirects the root "/" to "/login"
+import { Redirect } from 'expo-router';
+export default function Index() {
+  return <Redirect href="/login" />;
+}
