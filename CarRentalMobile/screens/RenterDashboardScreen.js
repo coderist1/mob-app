@@ -4,6 +4,8 @@ import {
   StyleSheet, Modal, Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
+import ProfileAvatar from '../components/ProfileAvatar';
 
 const C = {
   primary:   '#3F9B84',
@@ -98,7 +100,8 @@ function VehicleCard({ vehicle, isSaved, onSave, onView, onRent }) {
 
 export default function RenterDashboardScreen() {
   const router = useRouter();
-  const userName = 'Renter';
+  const { user } = useAuth();
+  const userName = user?.firstName || user?.fullName || 'Renter';
 
   const [searchQuery, setSearchQuery]   = useState('');
   const [savedCars,   setSavedCars]     = useState([]);
@@ -185,7 +188,7 @@ export default function RenterDashboardScreen() {
 
       {/* ── HEADER ── */}
       <View style={s.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={s.greeting}>Hello, {userName} 👋</Text>
           <Text style={s.headerSub}>Find your perfect ride</Text>
         </View>
@@ -193,9 +196,7 @@ export default function RenterDashboardScreen() {
           <TouchableOpacity style={s.headerBtn} onPress={() => setShowHistory(true)}>
             <Text style={s.headerBtnText}>📋 My Rentals</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.replace('/login')}>
-            <Text style={s.logoutBtn}>Logout</Text>
-          </TouchableOpacity>
+          <ProfileAvatar size={38} />
         </View>
       </View>
 

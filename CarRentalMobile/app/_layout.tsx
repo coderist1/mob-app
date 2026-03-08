@@ -1,14 +1,20 @@
-// app/_layout.tsx
+// app/_layout.js  –  Root layout
+// Wraps every screen with AuthProvider so useAuth() works everywhere.
+
 import { Stack } from 'expo-router';
+import { AuthProvider } from '../context/AuthContext';
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index"     options={{ headerShown: false }} />
-      <Stack.Screen name="login"     options={{ headerShown: false }} />
-      <Stack.Screen name="register"  options={{ headerShown: false }} />
-      <Stack.Screen name="dashboard" options={{ headerShown: false }} />
-      <Stack.Screen name="renter"    options={{ headerShown: false }} />
-    </Stack>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index"    />
+        <Stack.Screen name="login"    />
+        <Stack.Screen name="register" />
+        <Stack.Screen name="dashboard"/>
+        <Stack.Screen name="renter"   />
+        <Stack.Screen name="profile"  />
+      </Stack>
+    </AuthProvider>
   );
 }

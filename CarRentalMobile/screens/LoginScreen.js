@@ -1,3 +1,4 @@
+// screens/LoginScreen.js  – with AuthContext integration
 import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -5,6 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { useAuth } from '../context/AuthContext';   // ← NEW
 
 const C = {
   primary:   '#3F9B84', primaryDk: '#2d7a67', primaryLt: '#ecfdf5',
@@ -55,6 +57,36 @@ const ArrowIcon = () => (
   </Svg>
 );
 
+// ── Demo users (simulate a user DB) ──────────────────────────────────────────
+const DEMO_USERS = {
+  'owner@test.com': {
+    id: 'u_owner', role: 'owner',
+    firstName: 'Alex', lastName: 'Reyes', middleName: 'B.',
+    fullName: 'Alex Reyes', email: 'owner@test.com',
+    sex: 'male', dob: '1990-05-15T00:00:00.000Z',
+    phone: '+63 912 345 6789',
+    joinedAt: '2024-01-10T00:00:00.000Z',
+    avatar: null,
+  },
+  'renter@test.com': {
+    id: 'u_renter', role: 'renter',
+    firstName: 'Maria', lastName: 'Santos', middleName: 'C.',
+    fullName: 'Maria Santos', email: 'renter@test.com',
+    sex: 'female', dob: '1995-08-22T00:00:00.000Z',
+    phone: '+63 917 654 3210',
+    joinedAt: '2024-03-01T00:00:00.000Z',
+    avatar: null,
+  },
+  'admin@test.com': {
+    id: 'u_admin', role: 'admin',
+    firstName: 'Admin', lastName: 'User', middleName: '',
+    fullName: 'Admin User', email: 'admin@test.com',
+    sex: '', dob: null, phone: '',
+    joinedAt: '2023-01-01T00:00:00.000Z',
+    avatar: null,
+  },
+};
+
 const DEMO = [
   { label: 'Owner',  email: 'owner@test.com',  pass: 'password' },
   { label: 'Renter', email: 'renter@test.com', pass: 'password' },
@@ -62,8 +94,9 @@ const DEMO = [
 ];
 
 export default function LoginScreen() {
-  const router     = useRouter();
-  const scrollRef  = useRef(null);
+  const router    = useRouter();
+  const { login } = useAuth();   // ← NEW
+  const scrollRef = useRef(null);
   const pwInputRef = useRef(null);
 
   const [email,    setEmail]    = useState('');
@@ -73,7 +106,6 @@ export default function LoginScreen() {
   const [loading,  setLoading]  = useState(false);
   const [focused,  setFocused]  = useState(null);
 
-  // Store Y positions from onLayout
   const fieldY = useRef({});
 
   const scrollToField = (name) => {
@@ -92,10 +124,16 @@ export default function LoginScreen() {
     setTimeout(() => {
       setLoading(false);
       const e = email.trim().toLowerCase();
-      if      (e === 'owner@test.com')  router.replace('/dashboard');
-      else if (e === 'admin@test.com')  router.replace('/admin');
-      else if (e === 'renter@test.com') router.replace('/renter');
-      else setError('Invalid email or password. Please try again.');
+      const demoUser = DEMO_USERS[e];
+
+      if (demoUser) {
+        login(demoUser);   // ← Store user in context
+        if      (e === 'owner@test.com')  router.replace('/dashboard');
+        else if (e === 'admin@test.com')  router.replace('/admin');
+        else if (e === 'renter@test.com') router.replace('/renter');
+      } else {
+        setError('Invalid email or password. Please try again.');
+      }
     }, 1000);
   };
 
@@ -140,9 +178,7 @@ export default function LoginScreen() {
           )}
 
           {/* Email */}
-          <View
-            onLayout={e => { fieldY.current['email'] = e.nativeEvent.layout.y + 300; }}
-          >
+          <View onLayout={e => { fieldY.current['email'] = e.nativeEvent.layout.y + 300; }}>
             <Text style={s.label}>Email Address</Text>
             <View style={[s.inputWrap, focused === 'email' && s.inputFocused]}>
               <View style={s.iconBox}>
@@ -166,9 +202,7 @@ export default function LoginScreen() {
           </View>
 
           {/* Password */}
-          <View
-            onLayout={e => { fieldY.current['password'] = e.nativeEvent.layout.y + 300; }}
-          >
+          <View onLayout={e => { fieldY.current['password'] = e.nativeEvent.layout.y + 300; }}>
             <View style={s.labelRow}>
               <Text style={s.label}>Password</Text>
               <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -235,12 +269,7 @@ export default function LoginScreen() {
 
 const s = StyleSheet.create({
   scroll: { flexGrow: 1, backgroundColor: C.g50 },
-
-  hero: {
-    backgroundColor: C.navy,
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
-    paddingBottom: 52, paddingHorizontal: 24, overflow: 'hidden',
-  },
+  hero: { backgroundColor: C.navy, paddingTop: Platform.OS === 'ios' ? 60 : 48, paddingBottom: 52, paddingHorizontal: 24, overflow: 'hidden' },
   bubble1: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: C.primary, opacity: 0.07, top: -70, right: -50 },
   bubble2: { position: 'absolute', width: 130, height: 130, borderRadius: 65,  backgroundColor: C.primary, opacity: 0.05, bottom: -30, left: -30 },
   logoBox: { width: 58, height: 58, borderRadius: 18, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5 },
@@ -251,12 +280,7 @@ const s = StyleSheet.create({
   demoChip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(63,155,132,0.2)', borderWidth: 1, borderColor: 'rgba(63,155,132,0.4)' },
   demoChipText: { fontSize: 13, fontWeight: '700', color: '#7dd3c0' },
 
-  card: {
-    backgroundColor: C.white, marginHorizontal: 16, marginTop: -24,
-    borderRadius: 24, padding: 28,
-    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 }, elevation: 10,
-  },
+  card: { backgroundColor: C.white, marginHorizontal: 16, marginTop: -24, borderRadius: 24, padding: 28, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
   cardTitle: { fontSize: 22, fontWeight: '800', color: C.g800, marginBottom: 4 },
   cardSub:   { fontSize: 14, color: C.g500, marginBottom: 24 },
 
@@ -267,25 +291,13 @@ const s = StyleSheet.create({
   labelRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   forgotLink:{ fontSize: 12, color: C.primary, fontWeight: '600', marginBottom: 8 },
 
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.g50, borderWidth: 1.5, borderColor: C.g200,
-    borderRadius: 14, marginBottom: 20, overflow: 'hidden',
-  },
-  inputFocused: {
-    borderColor: C.primary, backgroundColor: C.primaryLt,
-    shadowColor: C.primary, shadowOpacity: 0.12, shadowRadius: 6, elevation: 2,
-  },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.g50, borderWidth: 1.5, borderColor: C.g200, borderRadius: 14, marginBottom: 20, overflow: 'hidden' },
+  inputFocused: { borderColor: C.primary, backgroundColor: C.primaryLt, shadowColor: C.primary, shadowOpacity: 0.12, shadowRadius: 6, elevation: 2 },
   iconBox:   { paddingLeft: 14, paddingRight: 4 },
   textInput: { flex: 1, paddingVertical: 16, paddingRight: 12, fontSize: 15, color: C.g800, fontWeight: '500' },
   eyeBtn:    { paddingHorizontal: 14, paddingVertical: 16 },
 
-  btn: {
-    backgroundColor: C.primary, borderRadius: 14, paddingVertical: 17,
-    alignItems: 'center', justifyContent: 'center', marginTop: 4, minHeight: 56,
-    shadowColor: C.primary, shadowOpacity: 0.4, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 }, elevation: 7,
-  },
+  btn: { backgroundColor: C.primary, borderRadius: 14, paddingVertical: 17, alignItems: 'center', justifyContent: 'center', marginTop: 4, minHeight: 56, shadowColor: C.primary, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 7 },
   btnText: { color: C.white, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
 
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 22 },
