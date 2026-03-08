@@ -38,25 +38,14 @@ const LogOutIcon = ({ color = C.danger }) => (
 );
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
-const STATS = [
-  { label: 'Total Revenue', value: '₱1.2M', change: '+12%', color: C.primary },
-  { label: 'Active Rentals', value: '84',    change: '+5%',  color: C.navy },
-  { label: 'Pending Cars',  value: '12',    change: 'Urgent', color: C.warning },
-  { label: 'Total Users',   value: '1,240', change: '+8%',  color: C.g600 },
-];
+// Default/demo data has been removed. Real data should be supplied
+// via props, context, or fetched from a backend service.
+const STATS = [];
 
-const MOCK_USERS = [
-  { id: '1', name: 'Juan Dela Cruz', email: 'juan@test.com', role: 'Renter', status: 'active' },
-  { id: '2', name: 'Maria Santos',   email: 'maria@test.com', role: 'Owner',  status: 'active' },
-  { id: '3', name: 'Pedro Penduko',  email: 'pedro@test.com', role: 'Renter', status: 'banned' },
-  { id: '4', name: 'Ana Reyes',      email: 'ana@test.com',   role: 'Owner',  status: 'active' },
-];
+const MOCK_USERS = [];
 
-const MOCK_APPROVALS = [
-  { id: 'v1', type: 'Vehicle', title: 'Toyota Fortuner 2023', owner: 'Maria Santos', date: '2 hrs ago' },
-  { id: 'v2', type: 'Vehicle', title: 'Honda Civic RS',       owner: 'Ana Reyes',    date: '5 hrs ago' },
-  { id: 'd1', type: 'Document', title: 'Driver License ID',   owner: 'New User',     date: '1 day ago' },
-];
+const MOCK_APPROVALS = [];
+
 
 const TABS = [
   { id: 'overview',  label: 'Overview',  icon: GridIcon },
