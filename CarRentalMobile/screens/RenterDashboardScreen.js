@@ -34,14 +34,8 @@ const C = {
   white: '#ffffff',
 };
 
-/* ─── DEMO DATA ─── */
-const DEMO_VEHICLES = [
-  { id: 1, name: 'Toyota Vios',    model: '1.3 E CVT',  year: '2022', pricePerDay: '2500', status: 'available', location: 'Davao City',    seats: '5', fuel: 'Gasoline', ownerName: 'Carlos Owner' },
-  { id: 2, name: 'Honda City',     model: '1.5 RS CVT', year: '2021', pricePerDay: '3000', status: 'available', location: 'Davao City',    seats: '5', fuel: 'Gasoline', ownerName: 'Carlos Owner' },
-  { id: 3, name: 'Mitsubishi Xpander', model: 'GLS',    year: '2023', pricePerDay: '3500', status: 'rented',   location: 'Tagum City',    seats: '7', fuel: 'Gasoline', ownerName: 'Ana Vehicle' },
-  { id: 4, name: 'Ford Everest',   model: 'Titanium',   year: '2022', pricePerDay: '5000', status: 'available', location: 'Davao City',   seats: '7', fuel: 'Diesel',   ownerName: 'Ana Vehicle' },
-  { id: 5, name: 'Toyota Hi-Ace',  model: 'GL Grandia', year: '2020', pricePerDay: '4500', status: 'available', location: 'Gensan',        seats: '15', fuel: 'Diesel',   ownerName: 'Ben Rentals' },
-];
+// vehicles available to rent – start empty, fill from backend/service
+const DEMO_VEHICLES = []; // keep placeholder constant for now
 
 /* ─── Vehicle Card ─── */
 function VehicleCard({ vehicle, onRent }) {
@@ -264,11 +258,8 @@ function BookingsTab() {
   const [search, setSearch] = useState('');
 
   // Demo bookings
-  const [bookings] = useState([
-    { id: 'b1', vehicleName: 'Toyota Vios',  vehicleModel: '1.3 E',    ownerName: 'Carlos Owner', startDate: '2026-03-10', endDate: '2026-03-12', totalPrice: 5000,  status: 'pending',   createdAt: '2026-03-08' },
-    { id: 'b2', vehicleName: 'Honda City',   vehicleModel: '1.5 RS',   ownerName: 'Carlos Owner', startDate: '2026-02-15', endDate: '2026-02-20', totalPrice: 15000, status: 'completed', createdAt: '2026-02-10' },
-    { id: 'b3', vehicleName: 'Ford Everest', vehicleModel: 'Titanium', ownerName: 'Ana Vehicle',  startDate: '2026-03-01', endDate: '2026-03-05', totalPrice: 20000, status: 'approved',  createdAt: '2026-02-28' },
-  ]);
+  // bookings list kept empty until data is loaded
+  const [bookings] = useState([]);
 
   const stats = useMemo(() => ({
     total:    bookings.length,
@@ -376,7 +367,7 @@ export default function RenterDashboardScreen() {
 
   const userName = user?.firstName || user?.fullName || 'Renter';
 
-  // Demo my rentals
+  // placeholder for the renter's own rentals, start empty
   const myRentals = [];
 
   const handleTabPress = tab => {
@@ -393,8 +384,8 @@ export default function RenterDashboardScreen() {
     }
   };
 
-  // Pending bookings badge
-  const pendingCount = 1; // from demo data
+  // Pending bookings badge (calculate from real data)
+  const pendingCount = 0;
 
   return (
     <View style={{ flex: 1, backgroundColor: '#edf1f7' }}>

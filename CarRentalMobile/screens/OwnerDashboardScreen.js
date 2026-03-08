@@ -334,20 +334,15 @@ export default function OwnerDashboardScreen() {
   const [activeTab, setActiveTab] = useState('home');
   const [pendingLogRental, setPendingLogRental] = useState(null);
 
-  const [vehicles, setVehicles] = useState([
-    { id: 1, name: 'Toyota Vios', model: '1.3 E', year: '2022', pricePerDay: '2500', status: 'available', location: 'Davao City', seats: '5', fuel: 'Gasoline' },
-    { id: 2, name: 'Honda City',  model: '1.5 RS', year: '2021', pricePerDay: '3000', status: 'rented',    location: 'Davao City', seats: '5', fuel: 'Gasoline' },
-  ]);
+  // vehicles array starts empty; real data should come from persistent storage or backend
+  const [vehicles, setVehicles] = useState([]);
   const [searchQuery,   setSearchQuery]   = useState('');
   const [showAddModal,  setShowAddModal]  = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTarget,    setEditTarget]    = useState(null);
 
-  const [rentalHistory, setRentalHistory] = useState([
-    { id: 'r1', vehicleId: 2, vehicleName: 'Honda City',  renterName: 'Juan Dela Cruz', renterId: 'u_renter', startDate: '2026-03-01', endDate: '2026-03-05', totalPrice: 15000, pricePerDay: 3000, status: 'approved'  },
-    { id: 'r2', vehicleId: 1, vehicleName: 'Toyota Vios', renterName: 'Maria Santos',   renterId: 'u_renter', startDate: '2026-02-15', endDate: '2026-02-20', totalPrice: 12500, pricePerDay: 2500, status: 'completed' },
-    { id: 'r3', vehicleId: 1, vehicleName: 'Toyota Vios', renterName: 'Pedro Reyes',    renterId: 'u_renter', startDate: '2026-03-10', endDate: '2026-03-12', totalPrice: 5000,  pricePerDay: 2500, status: 'pending'   },
-  ]);
+  // rentalHistory initially empty; populate from server or storage
+  const [rentalHistory, setRentalHistory] = useState([]);
 
   const userName    = user?.firstName || user?.fullName || 'Owner';
   const pendingCount = rentalHistory.filter(r => r.status === 'pending').length;

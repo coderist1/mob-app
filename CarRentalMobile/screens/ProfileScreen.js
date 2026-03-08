@@ -216,18 +216,8 @@ export default function ProfileScreen() {
   const sexLabel = u.sex === 'prefer_not' ? 'Prefer not to say'
     : u.sex ? (u.sex.charAt(0).toUpperCase() + u.sex.slice(1)) : '';
 
-  // ── Stats mock data by role ───────────────────────────────────────────────
-  const stats = u.role === 'owner'
-    ? [
-        { label: 'Vehicles Listed', value: '3',   color: C.primary },
-        { label: 'Active Rentals',  value: '1',   color: C.warning  },
-        { label: 'Total Earnings',  value: '₱18k', color: C.success  },
-      ]
-    : [
-        { label: 'Trips Taken',     value: '5',   color: C.primary },
-        { label: 'Active Booking',  value: '1',   color: C.warning  },
-        { label: 'Total Spent',     value: '₱9.2k', color: C.renterAccent || '#6366f1' },
-      ];
+  // ── Stats placeholders removed; compute from real user data or context
+  const stats = []; // replace with real stats when available
 
   // ── Input style helper ────────────────────────────────────────────────────
   const inputStyle = (field) => [
