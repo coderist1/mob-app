@@ -1,36 +1,90 @@
 // screens/LogReportScreen.js
-// Mobile port of OwnerLogReport.jsx
-// Owner: full CRUD (create check-in, add check-out, edit, delete, comments, signatures)
-// Renter: read-only view of reports linked to their rentals
+// Full mobile Log Report — owner CRUD + renter read-only
+// Matches web spec exactly: check-in/check-out, fuel gauge, damage compare,
+// trip summary, signatures, comments, stats bar, search, detail view.
 
 import React, { useState, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput, Modal,
-  StyleSheet, Alert, ActivityIndicator, Platform,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  Modal, StyleSheet, Alert, Platform, Image,
 } from 'react-native';
+import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
 import { useLogReport } from '../context/LogReportContext';
 
 /* ─── Design tokens ─── */
 const C = {
-  primary:   '#3F9B84',
-  primaryDk: '#2e7d67',
-  primaryLt: '#ecfdf5',
+  primary:   '#3F9B84', primaryDk: '#2e7d67', primaryLt: '#ecfdf5',
   navy:      '#1a2c5e',
-  danger:    '#ef4444',
-  warning:   '#f59e0b',
-  success:   '#22c55e',
-  g50:  '#f9fafb',
-  g100: '#f3f4f6',
-  g200: '#e5e7eb',
-  g300: '#d1d5db',
-  g400: '#9ca3af',
-  g500: '#6b7280',
-  g700: '#374151',
-  g900: '#111827',
+  danger:    '#ef4444', dangerLt: '#fef2f2',
+  warning:   '#f59e0b', warningLt: '#fffbeb',
+  success:   '#22c55e', successLt: '#f0fdf4',
+  blue:      '#3b82f6', blueLt:   '#eff6ff',
+  purple:    '#8b5cf6', purpleLt: '#f5f3ff',
+  g50:  '#f9fafb', g100: '#f3f4f6', g200: '#e5e7eb',
+  g300: '#d1d5db', g400: '#9ca3af', g500: '#6b7280',
+  g700: '#374151', g900: '#111827',
   white: '#ffffff',
 };
 
+/* ─── SVG Icons ─── */
+const Ic = {
+  Search: ({ s = 16, c = C.g400 }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="11" cy="11" r="8" /><Path d="M21 21l-4.35-4.35" />
+    </Svg>
+  ),
+  Trash: ({ s = 16, c = C.danger }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M3 6h18M19 6l-1 14H6L5 6M10 11v6M14 11v6" /><Path d="M9 6V4h6v2" />
+    </Svg>
+  ),
+  Edit: ({ s = 15, c = C.primary }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </Svg>
+  ),
+  Back: ({ s = 18, c = C.white }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M15 18l-6-6 6-6" />
+    </Svg>
+  ),
+  Plus: ({ s = 16, c = C.white }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 5v14M5 12h14" />
+    </Svg>
+  ),
+  Check: ({ s = 14, c = C.white }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M5 13l4 4L19 7" />
+    </Svg>
+  ),
+  Close: ({ s = 14, c = C.g500 }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M18 6L6 18M6 6l12 12" />
+    </Svg>
+  ),
+  Send: ({ s = 16, c = C.white }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" />
+    </Svg>
+  ),
+  Camera: ({ s = 18, c = C.g500 }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <Circle cx="12" cy="13" r="4" />
+    </Svg>
+  ),
+  Car: ({ s = 16, c = C.primary }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+      <Circle cx="7" cy="17" r="2" /><Path d="M9 17h6" /><Circle cx="17" cy="17" r="2" />
+    </Svg>
+  ),
+};
+
+/* ─── Constants ─── */
 const DEFAULT_CHECKLIST = [
   { id: 'exterior_scratches', label: 'Exterior scratches / dents' },
   { id: 'windshield',         label: 'Windshield cracks / chips'  },
@@ -42,118 +96,132 @@ const DEFAULT_CHECKLIST = [
   { id: 'fuel_low',           label: 'Fuel level low'             },
 ];
 
-const FUEL_OPTS         = ['Full', '3/4', '1/2', '1/4', 'Empty'];
-const CONDITION_RATINGS = ['Excellent', 'Good', 'Fair', 'Poor'];
+const FUEL_OPTS = ['Full', '3/4', '1/2', '1/4', 'Empty'];
+const COND_OPTS = [
+  { v: 'Excellent', bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
+  { v: 'Good',      bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
+  { v: 'Fair',      bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+  { v: 'Poor',      bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
+];
 
-const COND_COLORS = {
-  Excellent: { bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
-  Good:      { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
-  Fair:      { bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
-  Poor:      { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
-};
+const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+const fmtDateTime = d => d ? new Date(d).toLocaleString() : '—';
 
-const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
-const fmtDateTime = iso => iso ? new Date(iso).toLocaleString() : '—';
-
-/* ═══════════ SMALL COMPONENTS ═══════════ */
+/* ═══════════════════════════════════════════
+   SMALL SHARED COMPONENTS
+═══════════════════════════════════════════ */
 
 function Pill({ label, bg, color, border }) {
   return (
-    <View style={{ backgroundColor: bg, borderColor: border || bg, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' }}>
-      <Text style={{ fontSize: 10, fontWeight: '700', color, letterSpacing: 0.5 }}>{label.toUpperCase()}</Text>
+    <View style={{ backgroundColor: bg, borderColor: border || bg, borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, alignSelf: 'flex-start' }}>
+      <Text style={{ fontSize: 10, fontWeight: '700', color, letterSpacing: 0.4 }}>{label.toUpperCase()}</Text>
     </View>
   );
 }
 
-function Section({ title, children }) {
+function SectionHeader({ title }) {
   return (
-    <View style={{ marginBottom: 20 }}>
-      {title && (
-        <View style={{ borderBottomWidth: 1, borderBottomColor: C.g100, paddingBottom: 6, marginBottom: 12 }}>
-          <Text style={{ fontSize: 11, fontWeight: '700', color: C.g400, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</Text>
-        </View>
-      )}
-      {children}
+    <View style={{ borderBottomWidth: 1, borderBottomColor: C.g100, paddingBottom: 6, marginBottom: 12, marginTop: 4 }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: C.g400, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</Text>
     </View>
   );
 }
 
-function FieldRow({ label, value }) {
+/* ─── Fuel Gauge Bar ─── */
+function FuelGauge({ level }) {
+  if (!level) return null;
+  const idx = FUEL_OPTS.indexOf(level);
+  if (idx < 0) return null;
+  const pct = [1, 0.75, 0.5, 0.25, 0.05][idx];
+  const color = pct >= 0.5 ? C.success : pct >= 0.25 ? C.warning : C.danger;
   return (
-    <View style={{ backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: C.g200, padding: 12, marginBottom: 8 }}>
-      <Text style={{ fontSize: 10, fontWeight: '700', color: C.g400, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 3 }}>{label}</Text>
-      <Text style={{ fontSize: 14, fontWeight: '600', color: C.g900 }}>{value || '—'}</Text>
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+        <Text style={{ fontSize: 11, color: C.g500 }}>Fuel Level</Text>
+        <Text style={{ fontSize: 11, fontWeight: '700', color }}>{level}</Text>
+      </View>
+      <View style={{ height: 8, backgroundColor: C.g200, borderRadius: 4, overflow: 'hidden' }}>
+        <View style={{ height: 8, width: `${pct * 100}%`, backgroundColor: color, borderRadius: 4 }} />
+      </View>
     </View>
   );
 }
 
-/* ═══════════ STATS BAR ═══════════ */
+/* ─── Condition Badge ─── */
+function CondBadge({ value }) {
+  const opt = COND_OPTS.find(o => o.v === value);
+  if (!opt) return null;
+  return <Pill label={value} bg={opt.bg} color={opt.color} border={opt.border} />;
+}
+
+/* ─── Stats Bar ─── */
 function StatsBar({ reports }) {
-  const complete  = reports.filter(r => !!r.checkout).length;
-  const awaiting  = reports.filter(r => !r.checkout).length;
-  const newDmg    = reports.filter(r => {
+  const complete = reports.filter(r => !!r.checkout).length;
+  const awaiting = reports.filter(r => !r.checkout).length;
+  const newDmg   = reports.filter(r => {
     if (!r.checkout) return false;
     const ci = r.issues || [], co = r.checkout.issues || [];
     return co.some(i => !ci.includes(i));
   }).length;
   const stats = [
-    { label: 'Total',    value: reports.length, color: C.primary },
-    { label: 'Complete', value: complete,        color: '#3b82f6' },
-    { label: 'Pending',  value: awaiting,        color: C.warning },
-    { label: 'Damage',   value: newDmg,          color: C.danger  },
+    { label: 'Total',           value: reports.length, color: C.primary },
+    { label: 'Trips Complete',  value: complete,        color: C.blue    },
+    { label: 'Awaiting C/O',    value: awaiting,        color: C.warning },
+    { label: 'New Damage',      value: newDmg,          color: C.danger  },
   ];
   return (
-    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
       {stats.map(s => (
-        <View key={s.label} style={{ flex: 1, backgroundColor: C.white, borderRadius: 10, padding: 10, borderLeftWidth: 3, borderLeftColor: s.color, borderWidth: 1, borderColor: s.color + '22', elevation: 2 }}>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: s.color }}>{s.value}</Text>
-          <Text style={{ fontSize: 10, color: C.g500, fontWeight: '500', marginTop: 2 }}>{s.label}</Text>
+        <View key={s.label} style={{ flex: 1, backgroundColor: C.white, borderRadius: 10, padding: 9, borderLeftWidth: 3, borderLeftColor: s.color, elevation: 2 }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: s.color }}>{s.value}</Text>
+          <Text style={{ fontSize: 9, color: C.g500, fontWeight: '500', marginTop: 2, lineHeight: 12 }}>{s.label}</Text>
         </View>
       ))}
     </View>
   );
 }
 
-/* ═══════════ CHECKLIST EDITOR ═══════════ */
-function ChecklistEditor({ issues, onChange }) {
+/* ═══════════════════════════════════════════
+   CHECKLIST EDITOR
+═══════════════════════════════════════════ */
+function ChecklistEditor({ issues, onChange, isCheckout = false, checkinIssues = [] }) {
   const [customInput, setCustomInput] = useState('');
   const [customItems, setCustomItems] = useState([]);
-
   const allItems = [...DEFAULT_CHECKLIST, ...customItems];
 
   const toggle = id => {
-    if (issues.includes(id)) onChange(issues.filter(i => i !== id));
-    else onChange([...issues, id]);
+    issues.includes(id) ? onChange(issues.filter(i => i !== id)) : onChange([...issues, id]);
   };
-
   const addCustom = () => {
-    const t = customInput.trim();
-    if (!t) return;
+    const t = customInput.trim(); if (!t) return;
     const id = `custom_${Date.now()}`;
     setCustomItems(prev => [...prev, { id, label: t }]);
     onChange([...issues, id]);
     setCustomInput('');
   };
-
   const removeCustom = id => {
     setCustomItems(prev => prev.filter(c => c.id !== id));
     onChange(issues.filter(i => i !== id));
   };
 
   return (
-    <Section title="Condition Checklist">
+    <View style={{ marginBottom: 18 }}>
+      <SectionHeader title="Condition Checklist" />
       {allItems.map(item => {
-        const checked = issues.includes(item.id);
+        const checked  = issues.includes(item.id);
+        const isNew    = isCheckout && checked && !checkinIssues.includes(item.id);
         const isCustom = !DEFAULT_CHECKLIST.find(d => d.id === item.id);
         return (
-          <TouchableOpacity key={item.id} onPress={() => toggle(item.id)} style={[styles.checkItem, checked && styles.checkItemActive]}>
-            <View style={[styles.checkBox, checked && styles.checkBoxActive]}>
-              {checked && <Text style={{ color: C.white, fontSize: 10, fontWeight: '800' }}>✓</Text>}
+          <TouchableOpacity key={item.id} onPress={() => toggle(item.id)}
+            style={[st.checkRow, checked && st.checkRowActive, isNew && st.checkRowNew]}>
+            <View style={[st.checkBox, checked && st.checkBoxActive]}>
+              {checked && <Ic.Check s={10} c={C.white} />}
             </View>
-            <Text style={[styles.checkLabel, checked && { color: C.primaryDk, fontWeight: '600' }]}>{item.label}</Text>
+            <Text style={[st.checkLabel, checked && { color: C.primaryDk, fontWeight: '600' }]}>{item.label}</Text>
+            {isNew && <View style={st.newBadge}><Text style={st.newBadgeText}>NEW</Text></View>}
             {isCustom && (
               <TouchableOpacity onPress={() => removeCustom(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={{ color: C.danger, fontSize: 12, fontWeight: '700', marginLeft: 8 }}>✕</Text>
+                <Ic.Close s={13} c={C.danger} />
               </TouchableOpacity>
             )}
           </TouchableOpacity>
@@ -161,530 +229,755 @@ function ChecklistEditor({ issues, onChange }) {
       })}
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
         <TextInput
-          style={[styles.input, { flex: 1, marginBottom: 0 }]}
+          style={[st.input, { flex: 1, marginBottom: 0, paddingVertical: 10 }]}
           placeholder="Add custom issue…"
           value={customInput}
           onChangeText={setCustomInput}
           onSubmitEditing={addCustom}
           returnKeyType="done"
         />
-        <TouchableOpacity onPress={addCustom} style={[styles.btnPrimary, { paddingHorizontal: 16, marginBottom: 0 }]}>
-          <Text style={styles.btnPrimaryText}>Add</Text>
+        <TouchableOpacity onPress={addCustom} style={[st.btnPrimary, { paddingHorizontal: 16, paddingVertical: 10 }]}>
+          <Text style={st.btnPrimaryText}>Add</Text>
         </TouchableOpacity>
       </View>
-    </Section>
+    </View>
   );
 }
 
-/* ═══════════ REPORT FORM ═══════════ */
-function ReportForm({ initial, subtitle, onSave, onCancel, isCheckout = false, checkinIssues = [] }) {
-  const [issues,    setIssues]   = useState(initial?.issues || []);
-  const [notes,     setNotes]    = useState(initial?.notes || '');
-  const [odometer,  setOdometer] = useState(initial?.odometer || '');
-  const [fuelLevel, setFuel]     = useState(initial?.fuelLevel || '');
-  const [cRating,   setCRating]  = useState(initial?.conditionRating || '');
-  const [dmgCost,   setDmgCost]  = useState(initial?.damageCost || '');
+/* ═══════════════════════════════════════════
+   REPORT FORM  (check-in OR check-out)
+═══════════════════════════════════════════ */
+function ReportForm({ initial = {}, onSave, onCancel, isCheckout = false, checkinIssues = [], rental = {} }) {
+  const [odometer,   setOdometer]   = useState(String(initial.odometer   || ''));
+  const [fuel,       setFuel]       = useState(initial.fuel       || '');
+  const [condition,  setCondition]  = useState(initial.condition  || '');
+  const [issues,     setIssues]     = useState(initial.issues     || []);
+  const [notes,      setNotes]      = useState(initial.notes      || '');
+  const [photos,     setPhotos]     = useState(initial.photos     || []);
+  const [dmgCost,    setDmgCost]    = useState(String(initial.damageCost || ''));
 
   const newIssues = isCheckout ? issues.filter(i => !checkinIssues.includes(i)) : [];
 
-  const handleSave = () => {
-    Alert.alert('Save Report?', 'Are you sure you want to save this condition record?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Save', onPress: () => onSave({
-          issues, notes, odometer, fuelLevel,
-          conditionRating: cRating,
-          damageCost: dmgCost || undefined,
-        })
-      },
+  const doSave = () => {
+    Alert.alert(
+      'Save Record',
+      'Are you sure you want to save this condition record?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save', onPress: () => onSave({
+            odometer: parseFloat(odometer) || 0,
+            fuel, condition, issues, notes, photos,
+            damageCost: isCheckout ? (parseFloat(dmgCost) || 0) : 0,
+          }),
+        },
+      ]
+    );
+  };
+
+  const doCancel = () => {
+    Alert.alert('Discard Changes?', 'Go back without saving? Your changes will be lost.', [
+      { text: 'Stay', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: onCancel },
     ]);
   };
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-      {subtitle && <Text style={{ fontSize: 13, color: C.g500, marginBottom: 20 }}>{subtitle}</Text>}
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      keyboardShouldPersistTaps="handled">
 
-      {/* Vehicle data */}
-      <Section title="Vehicle Data">
-        <Text style={styles.fieldLabel}>Odometer (km)</Text>
-        <TextInput style={styles.input} placeholder="e.g. 45230" keyboardType="numeric" value={odometer} onChangeText={setOdometer} />
-        <Text style={styles.fieldLabel}>Fuel Level</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {FUEL_OPTS.map(f => (
-              <TouchableOpacity key={f} onPress={() => setFuel(f === fuelLevel ? '' : f)}
-                style={[styles.pillBtn, fuelLevel === f && { backgroundColor: C.primary, borderColor: C.primary }]}>
-                <Text style={[styles.pillBtnText, fuelLevel === f && { color: C.white }]}>{f}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </ScrollView>
-      </Section>
+      {/* Rental info banner */}
+      <RentalBanner rental={rental} />
 
-      {/* Overall condition */}
-      <Section title="Overall Condition">
+      {/* New issues warning */}
+      {isCheckout && newIssues.length > 0 && (
+        <View style={st.dmgWarning}>
+          <Text style={st.dmgWarningText}>{newIssues.length} new issue{newIssues.length > 1 ? 's' : ''} found at check-out</Text>
+        </View>
+      )}
+
+      {/* 1 — Vehicle Data */}
+      <View style={{ marginBottom: 18 }}>
+        <SectionHeader title="Vehicle Data" />
+        <Text style={st.fieldLabel}>Odometer (km)</Text>
+        <TextInput
+          style={st.input}
+          keyboardType="numeric"
+          placeholder="e.g. 45200"
+          value={odometer}
+          onChangeText={setOdometer}
+        />
+        <Text style={[st.fieldLabel, { marginTop: 10 }]}>Fuel Level</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {CONDITION_RATINGS.map(r => {
-            const cc = COND_COLORS[r];
-            const active = cRating === r;
+          {FUEL_OPTS.map(f => (
+            <TouchableOpacity key={f} onPress={() => setFuel(fuel === f ? '' : f)}
+              style={[st.pillBtn, fuel === f && st.pillBtnActive]}>
+              <Text style={[st.pillBtnText, fuel === f && st.pillBtnTextActive]}>{f}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <FuelGauge level={fuel} />
+      </View>
+
+      {/* 2 — Overall Condition */}
+      <View style={{ marginBottom: 18 }}>
+        <SectionHeader title="Overall Condition" />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {COND_OPTS.map(o => (
+            <TouchableOpacity key={o.v} onPress={() => setCondition(condition === o.v ? '' : o.v)}
+              style={[st.condBtn, { borderColor: o.border, backgroundColor: condition === o.v ? o.bg : C.white }]}>
+              <Text style={[st.condBtnText, { color: condition === o.v ? o.color : C.g500 }]}>{o.v}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* 3 — Checklist */}
+      <ChecklistEditor
+        issues={issues}
+        onChange={setIssues}
+        isCheckout={isCheckout}
+        checkinIssues={checkinIssues}
+      />
+
+      {/* 4 — Notes */}
+      <View style={{ marginBottom: 18 }}>
+        <SectionHeader title="Notes" />
+        <TextInput
+          style={[st.input, { height: 90, textAlignVertical: 'top' }]}
+          multiline
+          placeholder="Any additional observations…"
+          value={notes}
+          onChangeText={setNotes}
+        />
+      </View>
+
+      {/* 5 — Damage cost (checkout only) */}
+      {isCheckout && (
+        <View style={{ marginBottom: 18 }}>
+          <SectionHeader title="Damage Assessment" />
+          <Text style={st.fieldLabel}>Estimated Damage Cost (₱)</Text>
+          <TextInput
+            style={st.input}
+            keyboardType="numeric"
+            placeholder="0"
+            value={dmgCost}
+            onChangeText={setDmgCost}
+          />
+        </View>
+      )}
+
+      {/* Actions */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+        <TouchableOpacity onPress={doCancel} style={[st.btnSecondary, { flex: 1 }]}>
+          <Text style={st.btnSecondaryText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={doSave} style={[st.btnPrimary, { flex: 2 }]}>
+          <Text style={st.btnPrimaryText}>Save Record</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+/* ─── Rental Info Banner ─── */
+function RentalBanner({ rental }) {
+  if (!rental || !rental.vehicleName) return null;
+  return (
+    <View style={st.rentalBanner}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <Ic.Car s={14} c={C.primary} />
+        <Text style={{ fontSize: 14, fontWeight: '800', color: C.navy }}>{rental.vehicleName}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        {rental.renterName  && <Text style={st.bannerMeta}>Renter: <Text style={{ color: C.g900, fontWeight: '600' }}>{rental.renterName}</Text></Text>}
+        {rental.startDate   && <Text style={st.bannerMeta}>{fmtDate(rental.startDate)} – {fmtDate(rental.endDate)}</Text>}
+        {rental.pricePerDay && <Text style={st.bannerMeta}>₱{parseFloat(rental.pricePerDay).toLocaleString()}/day</Text>}
+      </View>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   TRIP SUMMARY CARD
+═══════════════════════════════════════════ */
+function TripSummary({ report }) {
+  const { checkin, checkout, rental } = report;
+  if (!checkin || !checkout) return null;
+
+  const start = rental?.startDate ? new Date(rental.startDate) : null;
+  const end   = rental?.endDate   ? new Date(rental.endDate)   : null;
+  const days  = (start && end) ? Math.max(1, Math.ceil((end - start) / 86400000)) : null;
+  const rate  = parseFloat(rental?.pricePerDay) || 0;
+  const rev   = days ? days * rate : null;
+  const kmDriven = (checkout.odometer > checkin.odometer) ? checkout.odometer - checkin.odometer : null;
+
+  const ciIssues = checkin.issues  || [];
+  const coIssues = checkout.issues || [];
+  const newDmg   = coIssues.filter(i => !ciIssues.includes(i));
+
+  let statusLabel = 'Clean Return';
+  let statusBg    = C.successLt;
+  let statusColor = C.success;
+  if (newDmg.length > 0)         { statusLabel = 'Damage Reported'; statusBg = C.dangerLt;  statusColor = C.danger;  }
+  else if (coIssues.length > 0)  { statusLabel = 'Minor Issues';    statusBg = C.warningLt; statusColor = C.warning; }
+
+  return (
+    <View style={st.tripCard}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: C.navy }}>Trip Summary</Text>
+        <View style={{ backgroundColor: statusBg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: statusColor }}>{statusLabel}</Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {days     != null && <MetricBox label="Days Rented"  value={String(days)}                              />}
+        {rev      != null && <MetricBox label="Revenue"      value={`₱${rev.toLocaleString()}`}                />}
+        {kmDriven != null && <MetricBox label="km Driven"    value={`${kmDriven.toLocaleString()} km`}         />}
+        <MetricBox label="New Issues" value={String(newDmg.length)} danger={newDmg.length > 0} />
+        {checkout.damageCost > 0 && <MetricBox label="Damage Est." value={`₱${checkout.damageCost.toLocaleString()}`} danger />}
+      </View>
+      {checkout.damageCost > 0 && (
+        <View style={[st.dmgWarning, { marginTop: 12 }]}>
+          <Text style={st.dmgWarningText}>Damage estimated at ₱{checkout.damageCost.toLocaleString()}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function MetricBox({ label, value, danger = false }) {
+  return (
+    <View style={{ backgroundColor: C.g50, borderRadius: 8, padding: 10, minWidth: 80, borderWidth: 1, borderColor: danger ? C.danger + '30' : C.g200 }}>
+      <Text style={{ fontSize: 15, fontWeight: '800', color: danger ? C.danger : C.navy }}>{value}</Text>
+      <Text style={{ fontSize: 10, color: C.g500, marginTop: 2 }}>{label}</Text>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   CONDITION COLUMN (before / after)
+═══════════════════════════════════════════ */
+function ConditionColumn({ title, data, newIssues = [], onEdit, isOwner }) {
+  if (!data) return (
+    <View style={[st.condCol, { justifyContent: 'center', alignItems: 'center' }]}>
+      <Text style={{ color: C.g400, fontSize: 13, fontStyle: 'italic' }}>No data</Text>
+    </View>
+  );
+  return (
+    <View style={st.condCol}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <Text style={{ fontSize: 12, fontWeight: '800', color: C.navy }}>{title}</Text>
+        {isOwner && onEdit && (
+          <TouchableOpacity onPress={onEdit} style={st.editBtn}>
+            <Ic.Edit s={13} c={C.primary} />
+            <Text style={{ fontSize: 11, color: C.primary, fontWeight: '600', marginLeft: 3 }}>Edit</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {/* Odometer */}
+      <View style={st.miniField}>
+        <Text style={st.miniLabel}>Odometer</Text>
+        <Text style={st.miniVal}>{data.odometer ? `${data.odometer.toLocaleString()} km` : '—'}</Text>
+      </View>
+      {/* Fuel */}
+      <View style={st.miniField}>
+        <Text style={st.miniLabel}>Fuel</Text>
+        <Text style={st.miniVal}>{data.fuel || '—'}</Text>
+        <FuelGauge level={data.fuel} />
+      </View>
+      {/* Condition */}
+      {data.condition && (
+        <View style={[st.miniField, { alignItems: 'flex-start' }]}>
+          <Text style={st.miniLabel}>Condition</Text>
+          <CondBadge value={data.condition} />
+        </View>
+      )}
+      {/* Issues */}
+      {data.issues && data.issues.length > 0 && (
+        <View style={st.miniField}>
+          <Text style={st.miniLabel}>Issues</Text>
+          {data.issues.map(id => {
+            const item = DEFAULT_CHECKLIST.find(d => d.id === id);
+            const label = item ? item.label : id;
+            const isNew = newIssues.includes(id);
             return (
-              <TouchableOpacity key={r} onPress={() => setCRating(active ? '' : r)}
-                style={[styles.pillBtn, active && { backgroundColor: cc.bg, borderColor: cc.border }]}>
-                <Text style={[styles.pillBtnText, active && { color: cc.color, fontWeight: '700' }]}>{r}</Text>
-              </TouchableOpacity>
+              <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: isNew ? C.danger : C.g400 }} />
+                <Text style={{ fontSize: 12, color: isNew ? C.danger : C.g700, flex: 1 }}>{label}</Text>
+                {isNew && <View style={st.newBadge}><Text style={st.newBadgeText}>NEW</Text></View>}
+              </View>
             );
           })}
         </View>
-      </Section>
-
-      <ChecklistEditor issues={issues} onChange={setIssues} />
-
-      {/* Damage cost if checkout with new issues */}
-      {isCheckout && newIssues.length > 0 && (
-        <View style={{ backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 20 }}>
-          <Text style={{ color: '#991b1b', fontWeight: '700', fontSize: 13, marginBottom: 10 }}>
-            ⚠ {newIssues.length} new issue{newIssues.length > 1 ? 's' : ''} found at check-out
-          </Text>
-          <Text style={styles.fieldLabel}>Estimated Damage Cost (₱) — optional</Text>
-          <TextInput style={[styles.input, { borderColor: '#fca5a5' }]} placeholder="e.g. 5000" keyboardType="numeric" value={dmgCost} onChangeText={setDmgCost} />
+      )}
+      {/* Notes */}
+      {!!data.notes && (
+        <View style={st.miniField}>
+          <Text style={st.miniLabel}>Notes</Text>
+          <Text style={{ fontSize: 12, color: C.g700, lineHeight: 18 }}>{data.notes}</Text>
         </View>
       )}
-
-      {/* Notes */}
-      <Section title="Notes">
-        <TextInput style={[styles.input, { height: 88, textAlignVertical: 'top' }]} multiline
-          placeholder="Describe the vehicle condition, any observations…" value={notes} onChangeText={setNotes} />
-      </Section>
-
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-        <TouchableOpacity onPress={() => Alert.alert('Discard?', 'Cancel without saving?', [
-          { text: 'No' },
-          { text: 'Yes, Discard', style: 'destructive', onPress: onCancel },
-        ])} style={[styles.btnSecondary, { flex: 1 }]}>
-          <Text style={styles.btnSecondaryText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleSave} style={[styles.btnPrimary, { flex: 2 }]}>
-          <Text style={styles.btnPrimaryText}>Save Report</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
-/* ═══════════ DETAIL VIEW ═══════════ */
-function DetailView({ report, ownerName, isOwner, onEdit, onAddCheckout, onEditCheckout, onBack, onReply }) {
-  const [comment, setComment] = useState('');
-  const ciIssues = report.issues || [];
-  const coIssues = report.checkout?.issues || [];
-  const newDmg   = coIssues.filter(i => !ciIssues.includes(i));
+/* ═══════════════════════════════════════════
+   SIGNATURES
+═══════════════════════════════════════════ */
+function SignaturesSection({ report, onUpdate, isOwner }) {
+  const [editing,   setEditing]   = useState(false);
+  const [ownerSig,  setOwnerSig]  = useState(report.ownerSignature  || '');
+  const [renterSig, setRenterSig] = useState(report.renterSignature || '');
 
-  const getLabelForId = id => {
-    const found = DEFAULT_CHECKLIST.find(d => d.id === id);
-    return found ? found.label : (report.customLabels?.[id] || id.replace('custom_', '').replace(/_/g, ' '));
+  const doSave = () => {
+    Alert.alert('Save Signatures?', '', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Save', onPress: () => {
+          onUpdate({
+            ownerSignature:  { name: ownerSig,  signedAt: new Date().toISOString() },
+            renterSignature: { name: renterSig, signedAt: new Date().toISOString() },
+          });
+          setEditing(false);
+        },
+      },
+    ]);
   };
 
-  const submitComment = () => {
-    if (!comment.trim()) return;
-    onReply({ authorName: ownerName || (isOwner ? 'Owner' : 'Renter'), authorRole: isOwner ? 'owner' : 'renter', text: comment.trim() });
-    setComment('');
+  const doCancel = () => {
+    Alert.alert('Discard Changes?', '', [
+      { text: 'Stay', style: 'cancel' },
+      { text: 'Discard', style: 'destructive', onPress: () => { setEditing(false); } },
+    ]);
   };
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      {/* Back */}
-      <TouchableOpacity onPress={onBack} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-        <Text style={{ fontSize: 15, color: C.primary, fontWeight: '600' }}>← Back to List</Text>
-      </TouchableOpacity>
-
-      {/* Status tags */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-        <Pill label="Check-in" bg="rgba(16,185,129,.1)" color="#059669" border="rgba(16,185,129,.25)" />
-        {report.checkout
-          ? <Pill label="✓ Trip Complete"      bg={C.primary + '14'} color={C.primary}  border={C.primary + '35'} />
-          : <Pill label="⏳ Awaiting Check-out" bg="rgba(245,158,11,.1)" color="#b45309" border="rgba(245,158,11,.3)" />}
-        {report.conditionRating && (() => {
-          const cc = COND_COLORS[report.conditionRating] || {};
-          return <Pill label={report.conditionRating} bg={cc.bg} color={cc.color} border={cc.border} />;
-        })()}
-        {newDmg.length > 0 && <Pill label={`${newDmg.length} New Damage`} bg="#fef2f2" color="#991b1b" border="#fca5a5" />}
+    <View style={st.sigSection}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text style={{ fontSize: 13, fontWeight: '800', color: C.navy }}>Signatures</Text>
+        {isOwner && !editing && (
+          <TouchableOpacity onPress={() => setEditing(true)} style={st.editBtn}>
+            <Ic.Edit s={13} c={C.primary} />
+            <Text style={{ fontSize: 11, color: C.primary, fontWeight: '600', marginLeft: 3 }}>Edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Vehicle & rental info */}
-      <View style={{ backgroundColor: C.primaryLt, borderWidth: 1, borderColor: C.primary + '28', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-        <Text style={{ fontSize: 10, fontWeight: '700', color: C.g400, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Rental Info</Text>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy, marginBottom: 4 }}>{report.vehicleName}</Text>
-        <Text style={{ fontSize: 13, color: C.g500 }}>Renter: <Text style={{ fontWeight: '600', color: C.g700 }}>{report.renterName || '—'}</Text></Text>
-        {report.startDate && <Text style={{ fontSize: 13, color: C.g500, marginTop: 2 }}>Period: <Text style={{ fontWeight: '600', color: C.g700 }}>{fmtDate(report.startDate)} → {fmtDate(report.endDate)}</Text></Text>}
-        {report.amount && <Text style={{ fontSize: 13, color: C.g500, marginTop: 2 }}>Rate: <Text style={{ fontWeight: '600', color: C.primary }}>₱{report.amount}/day</Text></Text>}
-      </View>
-
-      {/* Compare grid: Check-in vs Check-out */}
-      {report.checkout ? (
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-          {/* Check-in */}
-          <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(16,185,129,.2)', overflow: 'hidden' }}>
-            <View style={{ backgroundColor: 'rgba(16,185,129,.08)', padding: '10px 14px', padding: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(16,185,129,.2)' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#065f46' }}>Check-in</Text>
-              <Text style={{ fontSize: 10, color: C.g500 }}>{fmtDate(report.createdAt)}</Text>
-            </View>
-            <View style={{ padding: 10 }}>
-              <Text style={styles.miniLabel}>Odometer</Text><Text style={styles.miniVal}>{report.odometer ? report.odometer + ' km' : '—'}</Text>
-              <Text style={styles.miniLabel}>Fuel</Text><Text style={styles.miniVal}>{report.fuelLevel || '—'}</Text>
-              {report.conditionRating && <><Text style={styles.miniLabel}>Condition</Text><Text style={styles.miniVal}>{report.conditionRating}</Text></>}
-              <Text style={[styles.miniLabel, { marginTop: 8 }]}>Issues</Text>
-              {ciIssues.length === 0
-                ? <Text style={{ fontSize: 12, color: C.success, fontWeight: '600' }}>✓ None</Text>
-                : ciIssues.map(k => <Text key={k} style={{ fontSize: 12, color: C.g700, marginVertical: 1 }}>• {getLabelForId(k)}</Text>)}
-            </View>
+      {editing ? (
+        <>
+          <Text style={st.fieldLabel}>Owner Signature</Text>
+          <TextInput style={[st.input, { marginBottom: 12 }]} value={ownerSig} onChangeText={setOwnerSig} placeholder="Type name to sign…" />
+          <Text style={st.fieldLabel}>Renter Acknowledgement</Text>
+          <TextInput style={[st.input, { marginBottom: 16 }]} value={renterSig} onChangeText={setRenterSig} placeholder="Type name to sign…" />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity onPress={doCancel} style={[st.btnSecondary, { flex: 1 }]}>
+              <Text style={st.btnSecondaryText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={doSave} style={[st.btnPrimary, { flex: 1 }]}>
+              <Text style={st.btnPrimaryText}>Save</Text>
+            </TouchableOpacity>
           </View>
-          {/* Check-out */}
-          <View style={{ flex: 1, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245,158,11,.2)', overflow: 'hidden' }}>
-            <View style={{ backgroundColor: 'rgba(245,158,11,.08)', padding: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(245,158,11,.2)' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400e' }}>Check-out</Text>
-              <Text style={{ fontSize: 10, color: C.g500 }}>{fmtDate(report.checkout.createdAt)}</Text>
-            </View>
-            <View style={{ padding: 10 }}>
-              <Text style={styles.miniLabel}>Odometer</Text><Text style={styles.miniVal}>{report.checkout.odometer ? report.checkout.odometer + ' km' : '—'}</Text>
-              <Text style={styles.miniLabel}>Fuel</Text><Text style={styles.miniVal}>{report.checkout.fuelLevel || '—'}</Text>
-              {report.checkout.conditionRating && <><Text style={styles.miniLabel}>Condition</Text><Text style={styles.miniVal}>{report.checkout.conditionRating}</Text></>}
-              <Text style={[styles.miniLabel, { marginTop: 8 }]}>Issues</Text>
-              {coIssues.length === 0
-                ? <Text style={{ fontSize: 12, color: C.success, fontWeight: '600' }}>✓ None</Text>
-                : coIssues.map(k => {
-                    const isNew = !ciIssues.includes(k);
-                    return (
-                      <View key={k} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 1 }}>
-                        <Text style={{ fontSize: 12, color: isNew ? '#991b1b' : C.g700 }}>• {getLabelForId(k)}</Text>
-                        {isNew && <Text style={{ fontSize: 9, backgroundColor: '#ef4444', color: '#fff', borderRadius: 999, paddingHorizontal: 5, marginLeft: 4, fontWeight: '800' }}>NEW</Text>}
-                      </View>
-                    );
-                  })}
-              {report.checkout.damageCost && (
-                <Text style={{ fontSize: 12, color: C.danger, fontWeight: '700', marginTop: 6 }}>Damage: ₱{parseFloat(report.checkout.damageCost).toLocaleString()}</Text>
-              )}
-            </View>
-          </View>
-        </View>
+        </>
       ) : (
-        /* Check-in only */
-        <View style={{ marginBottom: 16 }}>
-          <Section title="Check-in Details">
-            <FieldRow label="Odometer" value={report.odometer ? report.odometer + ' km' : null} />
-            <FieldRow label="Fuel Level" value={report.fuelLevel} />
-            {report.conditionRating && <FieldRow label="Condition" value={report.conditionRating} />}
-          </Section>
-          <Section title="Issues">
-            {ciIssues.length === 0
-              ? <Text style={{ color: C.success, fontWeight: '600', fontSize: 13 }}>✓ No issues flagged</Text>
-              : ciIssues.map(k => (
-                  <View key={k} style={{ flexDirection: 'row', alignItems: 'center', padding: 8, backgroundColor: C.g50, borderRadius: 8, borderWidth: 1, borderColor: C.g200, marginBottom: 6 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.danger, marginRight: 8 }} />
-                    <Text style={{ fontSize: 13, color: C.g700 }}>{getLabelForId(k)}</Text>
-                  </View>
-                ))}
-          </Section>
-          {/* Awaiting checkout banner */}
-          <View style={{ backgroundColor: 'rgba(245,158,11,.07)', borderColor: 'rgba(245,158,11,.5)', borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, padding: 13, marginBottom: 16, alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, color: '#92400e', textAlign: 'center', lineHeight: 20 }}>
-              ⏳ Awaiting check-out.{'\n'}Record the vehicle condition when the renter returns.
-            </Text>
-          </View>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <SigBox label="Owner Signature" sig={report.ownerSignature} />
+          <SigBox label="Renter Acknowledgement" sig={report.renterSignature} />
         </View>
       )}
-
-      {/* Notes */}
-      {(report.notes || report.checkout?.notes) && (
-        <Section title="Notes">
-          {report.notes && (
-            <View style={{ backgroundColor: C.g50, borderWidth: 1, borderColor: C.g200, borderRadius: 8, padding: 12, marginBottom: 8 }}>
-              <Text style={{ fontSize: 11, color: C.g400, fontWeight: '700', marginBottom: 4 }}>CHECK-IN</Text>
-              <Text style={{ fontSize: 13, color: C.g700, lineHeight: 20 }}>{report.notes}</Text>
-            </View>
-          )}
-          {report.checkout?.notes && (
-            <View style={{ backgroundColor: C.g50, borderWidth: 1, borderColor: C.g200, borderRadius: 8, padding: 12 }}>
-              <Text style={{ fontSize: 11, color: C.g400, fontWeight: '700', marginBottom: 4 }}>CHECK-OUT</Text>
-              <Text style={{ fontSize: 13, color: C.g700, lineHeight: 20 }}>{report.checkout.notes}</Text>
-            </View>
-          )}
-        </Section>
-      )}
-
-      {/* Signatures */}
-      <Section title="Signatures">
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={[styles.sigBox, { flex: 1 }]}>
-            <Text style={styles.sigLabel}>Owner Signature</Text>
-            <Text style={styles.sigName}>{report.ownerSignature || '(not provided)'}</Text>
-          </View>
-          <View style={[styles.sigBox, { flex: 1 }]}>
-            <Text style={styles.sigLabel}>Renter Acknowledgement</Text>
-            <Text style={styles.sigName}>{report.renterSignature || '(not provided)'}</Text>
-          </View>
-        </View>
-      </Section>
-
-      {/* Comments */}
-      <Section title={`Comments${(report.comments || []).length ? ` (${report.comments.length})` : ''}`}>
-        {(report.comments || []).length === 0
-          ? <Text style={{ color: C.g400, fontSize: 13, marginBottom: 10 }}>No comments yet.</Text>
-          : (report.comments || []).map(c => {
-              const isOw = c.authorRole === 'owner';
-              return (
-                <View key={c.id} style={{
-                  borderRadius: 10, padding: 12, marginBottom: 8, borderLeftWidth: 3,
-                  borderLeftColor: isOw ? C.primary : '#6366f1',
-                  borderWidth: 1, borderColor: isOw ? C.primary + '22' : '#6366f122',
-                  backgroundColor: isOw ? C.primary + '05' : 'rgba(99,102,241,.03)',
-                }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: isOw ? C.primary : '#4338ca' }}>{c.authorName}</Text>
-                    <Text style={{ fontSize: 11, color: C.g400 }}>{fmtDateTime(c.createdAt)}</Text>
-                  </View>
-                  <Text style={{ fontSize: 13, color: C.g700, lineHeight: 18 }}>{c.text}</Text>
-                </View>
-              );
-            })}
-        {/* Reply box */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-          <TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]}
-            placeholder={isOwner ? 'Reply as owner…' : 'Add a comment…'}
-            value={comment} onChangeText={setComment} multiline />
-          <TouchableOpacity onPress={submitComment} style={[styles.btnPrimary, { paddingHorizontal: 16, alignSelf: 'flex-end', marginBottom: 0 }]}>
-            <Text style={styles.btnPrimaryText}>Send</Text>
-          </TouchableOpacity>
-        </View>
-      </Section>
-
-      {/* Owner action buttons */}
-      {isOwner && (
-        <View style={{ gap: 10, marginTop: 8 }}>
-          <TouchableOpacity onPress={onEdit} style={styles.btnOutline}>
-            <Text style={styles.btnOutlineText}>✏️ Edit Check-in</Text>
-          </TouchableOpacity>
-          {!report.checkout
-            ? <TouchableOpacity onPress={onAddCheckout} style={styles.btnPrimary}>
-                <Text style={styles.btnPrimaryText}>+ Record Check-out</Text>
-              </TouchableOpacity>
-            : <TouchableOpacity onPress={onEditCheckout} style={styles.btnOutline}>
-                <Text style={styles.btnOutlineText}>✏️ Edit Check-out</Text>
-              </TouchableOpacity>}
-        </View>
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
-/* ═══════════ MAIN SCREEN ═══════════ */
-export default function LogReportScreen() {
-  const { user } = useAuth();
-  const {
-    reports,
-    createCheckin,
-    editCheckin,
-    addCheckoutReport,
-    editCheckout,
-    removeReport,
-    postComment,
-  } = useLogReport();
+function SigBox({ label, sig }) {
+  return (
+    <View style={[st.sigBox, { flex: 1 }]}>
+      <Text style={st.miniLabel}>{label}</Text>
+      {sig?.name ? (
+        <>
+          <Text style={{ fontSize: 14, color: C.navy, fontStyle: 'italic', fontWeight: '600', marginTop: 4 }}>{sig.name}</Text>
+          <Text style={{ fontSize: 10, color: C.g400, marginTop: 3 }}>{fmtDateTime(sig.signedAt)}</Text>
+        </>
+      ) : (
+        <Text style={{ fontSize: 12, color: C.g300, fontStyle: 'italic', marginTop: 4 }}>Not signed</Text>
+      )}
+    </View>
+  );
+}
 
-  const isOwner = user?.role === 'owner';
+/* ═══════════════════════════════════════════
+   COMMENTS
+═══════════════════════════════════════════ */
+function CommentsSection({ report, onAddComment, currentUser }) {
+  const [text, setText] = useState('');
+  const comments = report.comments || [];
 
-  const [view,    setView]   = useState('list'); // list | detail | add-checkin | edit-checkin | add-checkout | edit-checkout
-  const [sel,     setSel]    = useState(null);
-  const [search,  setSearch] = useState('');
+  const doSend = () => {
+    const t = text.trim(); if (!t) return;
+    onAddComment(report.id, { text: t, authorName: currentUser.fullName || currentUser.firstName, authorRole: currentUser.role });
+    setText('');
+  };
 
-  // Filter reports by role
+  return (
+    <View style={st.commSection}>
+      <Text style={{ fontSize: 13, fontWeight: '800', color: C.navy, marginBottom: 12 }}>Comments</Text>
+      {comments.length === 0 ? (
+        <Text style={{ fontSize: 13, color: C.g400, fontStyle: 'italic', textAlign: 'center', paddingVertical: 12 }}>No comments yet.</Text>
+      ) : (
+        comments.map((c, i) => (
+          <View key={c.id || i} style={[st.commentCard, { borderLeftColor: c.authorRole === 'owner' ? C.primary : C.purple }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: C.g900 }}>{c.authorName}</Text>
+              <View style={{ backgroundColor: c.authorRole === 'owner' ? C.primaryLt : C.purpleLt, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: c.authorRole === 'owner' ? C.primary : C.purple }}>
+                  {c.authorRole === 'owner' ? 'Owner' : 'Renter'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11, color: C.g400, marginLeft: 'auto' }}>{fmtDateTime(c.createdAt)}</Text>
+            </View>
+            <Text style={{ fontSize: 13, color: C.g700, lineHeight: 19 }}>{c.text}</Text>
+          </View>
+        ))
+      )}
+      {/* Reply box */}
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+        <TextInput
+          style={[st.input, { flex: 1, marginBottom: 0, paddingVertical: 10 }]}
+          placeholder="Write a comment…"
+          value={text}
+          onChangeText={setText}
+          multiline
+        />
+        <TouchableOpacity
+          onPress={doSend}
+          disabled={!text.trim()}
+          style={[st.btnPrimary, { paddingHorizontal: 14, paddingVertical: 10, opacity: text.trim() ? 1 : 0.4 }]}>
+          <Ic.Send s={16} c={C.white} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   DETAIL VIEW
+═══════════════════════════════════════════ */
+function DetailView({ report, onBack, onUpdateReport, isOwner, currentUser, onAddComment }) {
+  const [view, setView] = useState('detail'); // detail | editCI | editCO | addCO
+
+  const ciIssues = report.checkin?.issues  || [];
+  const coIssues = report.checkout?.issues || [];
+  const newIssues = report.checkout ? coIssues.filter(i => !ciIssues.includes(i)) : [];
+
+  if (view === 'editCI') {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={st.subHeader}>
+          <Text style={st.subHeaderTitle}>Edit Check-in</Text>
+        </View>
+        <ReportForm
+          initial={report.checkin}
+          rental={report.rental}
+          onSave={data => { onUpdateReport(report.id, { checkin: { ...report.checkin, ...data } }); setView('detail'); }}
+          onCancel={() => setView('detail')}
+        />
+      </View>
+    );
+  }
+  if (view === 'addCO' || view === 'editCO') {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={st.subHeader}>
+          <Text style={st.subHeaderTitle}>{view === 'addCO' ? 'Add Check-out' : 'Edit Check-out'}</Text>
+        </View>
+        <ReportForm
+          initial={view === 'editCO' ? report.checkout : {}}
+          rental={report.rental}
+          isCheckout
+          checkinIssues={ciIssues}
+          onSave={data => { onUpdateReport(report.id, { checkout: { ...data } }); setView('detail'); }}
+          onCancel={() => setView('detail')}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Sub-header */}
+      <View style={[st.subHeader, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        <TouchableOpacity onPress={onBack} style={st.backBtn}>
+          <Ic.Back s={18} c={C.white} />
+        </TouchableOpacity>
+        <Text style={[st.subHeaderTitle, { flex: 1 }]}>Log Report Detail</Text>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+        {/* Rental banner */}
+        <RentalBanner rental={report.rental} />
+
+        {/* Trip summary */}
+        <TripSummary report={report} />
+
+        {/* Before/After comparison or pending notice */}
+        {report.checkout ? (
+          <>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: C.g500, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8, marginTop: 4 }}>Condition Comparison</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <ConditionColumn
+                title="Before Trip"
+                data={report.checkin}
+                onEdit={isOwner ? () => setView('editCI') : null}
+                isOwner={isOwner}
+              />
+              <ConditionColumn
+                title="After Trip"
+                data={report.checkout}
+                newIssues={newIssues}
+                onEdit={isOwner ? () => setView('editCO') : null}
+                isOwner={isOwner}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={st.pendingNotice}>
+              <Text style={{ fontSize: 13, color: '#92400e', fontWeight: '600', textAlign: 'center' }}>
+                No check-out report yet.{'\n'}Add one when the vehicle is returned.
+              </Text>
+            </View>
+            {isOwner && (
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                <TouchableOpacity onPress={() => setView('editCI')} style={[st.btnSecondary, { flex: 1 }]}>
+                  <Text style={st.btnSecondaryText}>Edit Check-in</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setView('addCO')} style={[st.btnPrimary, { flex: 1 }]}>
+                  <Text style={st.btnPrimaryText}>Add Check-out</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {/* Show check-in data alone */}
+            {report.checkin && (
+              <ConditionColumn
+                title="Check-in Record"
+                data={report.checkin}
+                onEdit={isOwner ? () => setView('editCI') : null}
+                isOwner={isOwner}
+              />
+            )}
+          </>
+        )}
+
+        {/* Signatures */}
+        <SignaturesSection
+          report={report}
+          isOwner={isOwner}
+          onUpdate={updates => onUpdateReport(report.id, updates)}
+        />
+
+        {/* Comments */}
+        <CommentsSection
+          report={report}
+          onAddComment={onAddComment}
+          currentUser={currentUser}
+        />
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   NEW ENTRY FORM  (called from Rentals tab)
+═══════════════════════════════════════════ */
+function NewEntryForm({ rental, onSave, onCancel }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={st.subHeader}>
+        <Text style={st.subHeaderTitle}>New Check-in Record</Text>
+      </View>
+      <ReportForm
+        initial={{}}
+        rental={rental}
+        onSave={data => onSave({ rental, checkin: data })}
+        onCancel={onCancel}
+      />
+    </View>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   MAIN LIST VIEW
+═══════════════════════════════════════════ */
+export default function LogReportScreen({ pendingRental, onClearPendingRental }) {
+  const { user }                                              = useAuth();
+  const { reports, addReport, updateReport, deleteReport, addComment } = useLogReport();
+
+  const isOwner  = user?.role === 'owner';
+  const isRenter = user?.role === 'renter';
+
+  const [search,   setSearch]   = useState('');
+  const [selected, setSelected] = useState(null); // detail view
+  const [newEntry, setNewEntry] = useState(null);  // rental being recorded
+
+  // If owner launched "Record to Log" from Rentals tab
+  React.useEffect(() => {
+    if (pendingRental) {
+      setNewEntry(pendingRental);
+      onClearPendingRental?.();
+    }
+  }, [pendingRental]);
+
   const myReports = useMemo(() => {
-    if (isOwner) return reports;
-    // Renter sees reports where they are the renter
-    return reports.filter(r => r.renterName === user?.fullName || r.renterName === user?.firstName || r.rentalId && true);
-  }, [reports, isOwner, user]);
+    if (isOwner)  return reports;
+    if (isRenter) return reports.filter(r => r.rental?.renterId === user?.id);
+    return [];
+  }, [reports, user]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return myReports;
     const q = search.toLowerCase();
     return myReports.filter(r =>
-      r.vehicleName?.toLowerCase().includes(q) ||
-      r.renterName?.toLowerCase().includes(q)
+      r.rental?.vehicleName?.toLowerCase().includes(q) ||
+      r.rental?.renterName?.toLowerCase().includes(q)
     );
   }, [myReports, search]);
 
-  const open = report => { setSel(report); setView('detail'); };
-  const backToList = () => { setSel(null); setView('list'); };
-
-  const handleSaveCI = updates => {
-    editCheckin(sel.id, updates);
-    // Refresh sel
-    setSel(prev => ({ ...prev, ...updates }));
-    setView('detail');
+  /* ── New entry save ── */
+  const handleNewSave = async ({ rental, checkin }) => {
+    await addReport({
+      rental,
+      checkin,
+      checkout: null,
+      comments: [],
+    });
+    setNewEntry(null);
   };
 
-  const handleAddCO = data => {
-    addCheckoutReport(sel.id, data);
-    setSel(prev => ({ ...prev, checkout: { ...data, createdAt: new Date().toISOString() } }));
-    setView('detail');
+  /* ── Update report ── */
+  const handleUpdateReport = async (id, updates) => {
+    await updateReport(id, updates);
+    // Refresh selected view
+    setSelected(prev => prev ? { ...prev, ...updates } : prev);
   };
 
-  const handleSaveCO = data => {
-    editCheckout(sel.id, data);
-    setSel(prev => ({ ...prev, checkout: { ...prev.checkout, ...data } }));
-    setView('detail');
-  };
-
+  /* ── Delete ── */
   const handleDelete = id => {
-    Alert.alert('Delete Entry?', 'This action cannot be undone.', [
+    Alert.alert('Delete Entry?', 'This will permanently remove the log entry.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => { removeReport(id); if (sel?.id === id) backToList(); } },
+      { text: 'Delete', style: 'destructive', onPress: () => { deleteReport(id); setSelected(null); } },
     ]);
   };
 
-  const handleReply = comment => {
-    postComment(sel.id, comment);
-    setSel(prev => ({ ...prev, comments: [...(prev.comments || []), { ...comment, id: `cmt-${Date.now()}`, createdAt: new Date().toISOString() }] }));
-  };
-
-  /* ── View: Detail ── */
-  if (view === 'detail' && sel) {
+  /* ── Sub-views ── */
+  if (newEntry) {
     return (
-      <DetailView
-        report={sel}
-        ownerName={user?.fullName || user?.firstName}
-        isOwner={isOwner}
-        onEdit={() => setView('edit-checkin')}
-        onAddCheckout={() => setView('add-checkout')}
-        onEditCheckout={() => setView('edit-checkout')}
-        onBack={backToList}
-        onReply={handleReply}
+      <NewEntryForm
+        rental={newEntry}
+        onSave={handleNewSave}
+        onCancel={() => setNewEntry(null)}
       />
     );
   }
 
-  /* ── View: Edit check-in ── */
-  if (view === 'edit-checkin' && sel) {
+  if (selected) {
+    // Always get freshest version from reports array
+    const fresh = reports.find(r => r.id === selected.id) || selected;
     return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.subHeader}>
-          <Text style={styles.subHeaderTitle}>Edit Check-in</Text>
-        </View>
-        <ReportForm
-          initial={sel}
-          subtitle="Update the check-in condition record."
-          onSave={handleSaveCI}
-          onCancel={() => setView('detail')}
-        />
-      </View>
+      <DetailView
+        report={fresh}
+        onBack={() => setSelected(null)}
+        onUpdateReport={handleUpdateReport}
+        onAddComment={addComment}
+        isOwner={isOwner}
+        currentUser={user}
+      />
     );
   }
 
-  /* ── View: Add checkout ── */
-  if (view === 'add-checkout' && sel) {
-    return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.subHeader}>
-          <Text style={styles.subHeaderTitle}>Record Check-out</Text>
-        </View>
-        <ReportForm
-          initial={{ ...sel, issues: [], notes: '', odometer: '', fuelLevel: '', conditionRating: '' }}
-          subtitle="Record the vehicle condition upon return."
-          isCheckout
-          checkinIssues={sel.issues || []}
-          onSave={handleAddCO}
-          onCancel={() => setView('detail')}
-        />
-      </View>
-    );
-  }
-
-  /* ── View: Edit checkout ── */
-  if (view === 'edit-checkout' && sel) {
-    return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.subHeader}>
-          <Text style={styles.subHeaderTitle}>Edit Check-out</Text>
-        </View>
-        <ReportForm
-          initial={{ ...sel.checkout, vehicleName: sel.vehicleName }}
-          subtitle="Update the check-out condition record."
-          isCheckout
-          checkinIssues={sel.issues || []}
-          onSave={handleSaveCO}
-          onCancel={() => setView('detail')}
-        />
-      </View>
-    );
-  }
-
-  /* ── View: List ── */
+  /* ── List ── */
   return (
-    <View style={{ flex: 1, backgroundColor: '#edf1f7' }}>
+    <View style={{ flex: 1, backgroundColor: C.g50 }}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={st.header}>
         <View>
-          <Text style={styles.headerTitle}>Log Book</Text>
-          <Text style={styles.headerSub}>
+          <Text style={st.headerTitle}>Log Report</Text>
+          <Text style={st.headerSub}>
             {isOwner ? 'Vehicle condition records' : 'Your rental condition reports'}
           </Text>
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
         <StatsBar reports={myReports} />
 
         {/* Search */}
-        <View style={styles.searchWrap}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput style={styles.searchInput}
+        <View style={st.searchWrap}>
+          <Ic.Search s={15} c={C.g400} />
+          <TextInput
+            style={st.searchInput}
             placeholder="Search by vehicle or renter…"
             placeholderTextColor={C.g400}
-            value={search} onChangeText={setSearch}
+            value={search}
+            onChangeText={setSearch}
           />
         </View>
 
-        {/* Empty */}
+        {/* Empty state */}
         {filtered.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={{ fontSize: 44, marginBottom: 12 }}>📋</Text>
-            <Text style={styles.emptyTitle}>No log entries yet</Text>
-            <Text style={styles.emptySub}>
+          <View style={st.emptyBox}>
+            <Text style={st.emptyTitle}>No log entries yet</Text>
+            <Text style={st.emptySub}>
               {isOwner
-                ? 'Use "Record to Log Book" on an approved rental to create a log entry.'
+                ? 'Go to Rentals, open an approved rental and tap "Record to Log Report".'
                 : 'Your rental condition reports will appear here.'}
             </Text>
           </View>
         ) : (
-          filtered.slice().reverse().map(r => {
-            const ciIssues = r.issues || [];
+          [...filtered].reverse().map(r => {
+            const ciIssues = r.checkin?.issues  || [];
             const coIssues = r.checkout?.issues || [];
             const newDmg   = r.checkout ? coIssues.filter(i => !ciIssues.includes(i)) : [];
+            const comments = r.comments || [];
+            const condOpt  = COND_OPTS.find(o => o.v === r.checkin?.condition);
             return (
-              <TouchableOpacity key={r.id} onPress={() => open(r)} style={styles.logCard} activeOpacity={0.85}>
+              <TouchableOpacity key={r.id} onPress={() => setSelected(r)} style={st.logCard} activeOpacity={0.85}>
                 <View style={{ flex: 1 }}>
                   {/* Tags */}
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 6 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 7 }}>
                     <Pill label="Check-in" bg="rgba(16,185,129,.1)" color="#059669" border="rgba(16,185,129,.25)" />
                     {r.checkout
-                      ? <Pill label="✓ Complete"  bg={C.primary + '14'} color={C.primary}  border={C.primary + '35'} />
-                      : <Pill label="⏳ Pending"  bg="rgba(245,158,11,.1)" color="#b45309" border="rgba(245,158,11,.3)" />}
+                      ? <Pill label="Trip Complete" bg={C.primary + '14'} color={C.primary} border={C.primary + '35'} />
+                      : <Pill label="Awaiting Check-out" bg="rgba(245,158,11,.1)" color="#b45309" border="rgba(245,158,11,.3)" />
+                    }
+                    {condOpt && <Pill label={r.checkin.condition} bg={condOpt.bg} color={condOpt.color} border={condOpt.border} />}
                     {newDmg.length > 0 && <Pill label={`${newDmg.length} New Damage`} bg="#fef2f2" color="#991b1b" border="#fca5a5" />}
+                    {comments.length > 0 && (
+                      <View style={{ backgroundColor: C.purpleLt, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: C.purple + '40' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: C.purple }}>{comments.length} Comment{comments.length > 1 ? 's' : ''}</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.navy, marginBottom: 4 }}>{r.vehicleName}</Text>
+                  {/* Vehicle name */}
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: C.navy, marginBottom: 4 }}>{r.rental?.vehicleName || 'Vehicle'}</Text>
+                  {/* Meta */}
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                    <Text style={{ fontSize: 12, color: C.g500 }}>{fmtDate(r.createdAt)}</Text>
+                    <Text style={{ fontSize: 12, color: C.g500 }}>{fmtDate(r.checkin?.createdAt || r.createdAt)}</Text>
                     {ciIssues.length > 0
-                      ? <Text style={{ fontSize: 12, color: '#b45309', fontWeight: '600' }}>⚠ {ciIssues.length} issue{ciIssues.length > 1 ? 's' : ''}</Text>
-                      : <Text style={{ fontSize: 12, color: C.success, fontWeight: '600' }}>✓ Clean</Text>}
-                    <Text style={{ fontSize: 12, color: C.g500 }}>👤 {r.renterName || '—'}</Text>
+                      ? <Text style={{ fontSize: 12, color: '#b45309', fontWeight: '600' }}>{ciIssues.length} issue{ciIssues.length > 1 ? 's' : ''}</Text>
+                      : <Text style={{ fontSize: 12, color: C.success, fontWeight: '600' }}>Clean check-in</Text>}
+                    {r.rental?.renterName && <Text style={{ fontSize: 12, color: C.g500 }}>{r.rental.renterName}</Text>}
+                    {r.checkout?.damageCost > 0 && (
+                      <Text style={{ fontSize: 12, color: C.danger, fontWeight: '700' }}>₱{r.checkout.damageCost.toLocaleString()} est.</Text>
+                    )}
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   {isOwner && (
-                    <TouchableOpacity onPress={e => { e && e.stopPropagation?.(); handleDelete(r.id); }}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Text style={{ color: C.danger, fontSize: 16 }}>🗑</Text>
+                    <TouchableOpacity onPress={() => handleDelete(r.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ic.Trash s={16} c={C.danger} />
                     </TouchableOpacity>
                   )}
-                  <Text style={{ fontSize: 18, color: C.g400 }}>›</Text>
+                  <Text style={{ fontSize: 20, color: C.g400 }}>›</Text>
                 </View>
               </TouchableOpacity>
             );
@@ -696,84 +989,176 @@ export default function LogReportScreen() {
 }
 
 /* ─── Styles ─── */
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   header: {
     backgroundColor: C.navy,
-    paddingTop: Platform.OS === 'ios' ? 56 : 44,
-    paddingBottom: 20,
+    paddingTop: Platform.OS === 'ios' ? 0 : 0,
+    paddingBottom: 16,
     paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 16,
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: C.white },
-  headerSub:   { fontSize: 13, color: 'rgba(255,255,255,.65)', marginTop: 2 },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: C.white },
+  headerSub:   { fontSize: 13, color: 'rgba(255,255,255,.6)', marginTop: 2 },
   subHeader: {
     backgroundColor: C.navy,
-    paddingTop: Platform.OS === 'ios' ? 56 : 44,
-    paddingBottom: 18,
-    paddingHorizontal: 20,
+    paddingTop: 16, paddingBottom: 16, paddingHorizontal: 20,
   },
-  subHeaderTitle: { fontSize: 18, fontWeight: '800', color: C.white },
+  subHeaderTitle: { fontSize: 17, fontWeight: '800', color: C.white },
+  backBtn: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
   searchWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: C.white,
-    borderRadius: 10, borderWidth: 1, borderColor: C.g200, paddingHorizontal: 12, marginBottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.white, borderRadius: 10,
+    borderWidth: 1, borderColor: C.g200,
+    paddingHorizontal: 12, paddingVertical: 8,
+    marginBottom: 14,
   },
-  searchIcon:  { fontSize: 14, marginRight: 8 },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: C.g900 },
+  searchInput: { flex: 1, fontSize: 14, color: C.g900 },
+
+  // List card
   logCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: C.white, borderRadius: 12, padding: 14, marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.white, borderRadius: 12,
+    padding: 14, marginBottom: 10,
     borderWidth: 1.5, borderColor: C.g200, elevation: 2,
   },
-  empty: { alignItems: 'center', padding: 50, backgroundColor: C.g50, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: C.g200 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: C.g700, marginBottom: 8 },
-  emptySub:   { fontSize: 13, color: C.g400, textAlign: 'center' },
-  checkItem: {
-    flexDirection: 'row', alignItems: 'center', padding: 10,
-    borderWidth: 1, borderColor: C.g200, borderRadius: 8, marginBottom: 6,
-    backgroundColor: C.g50,
+  emptyBox: {
+    alignItems: 'center', padding: 48,
+    backgroundColor: C.white, borderRadius: 12,
+    borderWidth: 1, borderStyle: 'dashed', borderColor: C.g200,
   },
-  checkItemActive: { borderColor: C.primary + '55', backgroundColor: C.primary + '08' },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: C.g700, marginBottom: 8 },
+  emptySub:   { fontSize: 13, color: C.g400, textAlign: 'center', lineHeight: 20 },
+
+  // Rental banner
+  rentalBanner: {
+    backgroundColor: C.primaryLt, borderRadius: 12,
+    borderWidth: 1, borderColor: C.primary + '30',
+    padding: 14, marginBottom: 14,
+  },
+  bannerMeta: { fontSize: 12, color: C.g500 },
+
+  // Trip card
+  tripCard: {
+    backgroundColor: C.white, borderRadius: 12,
+    borderWidth: 1, borderColor: C.g200,
+    padding: 14, marginBottom: 14, elevation: 2,
+  },
+
+  // Pending notice
+  pendingNotice: {
+    backgroundColor: C.warningLt, borderRadius: 10,
+    borderWidth: 1, borderColor: '#fde68a',
+    padding: 14, marginBottom: 14,
+    borderStyle: 'dashed',
+  },
+
+  // Condition columns
+  condCol: {
+    flex: 1, backgroundColor: C.white, borderRadius: 12,
+    borderWidth: 1, borderColor: C.g200, padding: 12, marginBottom: 14,
+  },
+  miniField: { marginBottom: 10 },
+  miniLabel: { fontSize: 10, fontWeight: '700', color: C.g400, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 },
+  miniVal:   { fontSize: 13, fontWeight: '600', color: C.g900 },
+
+  // Edit button
+  editBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.primaryLt, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: C.primary + '30',
+  },
+
+  // Checklist
+  checkRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 10, borderWidth: 1, borderColor: C.g200,
+    borderRadius: 8, marginBottom: 6, backgroundColor: C.g50,
+    gap: 10,
+  },
+  checkRowActive: { borderColor: C.primary + '55', backgroundColor: C.primary + '08' },
+  checkRowNew:    { borderColor: C.danger + '55',   backgroundColor: '#fef2f2' },
   checkBox: {
-    width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: C.g300,
-    alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0,
+    width: 18, height: 18, borderRadius: 4,
+    borderWidth: 1.5, borderColor: C.g300,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   checkBoxActive: { backgroundColor: C.primary, borderColor: C.primary },
   checkLabel: { flex: 1, fontSize: 13, color: C.g700 },
-  input: {
-    width: '100%', padding: 12, borderWidth: 1.5, borderColor: C.g200,
-    borderRadius: 10, fontSize: 14, color: C.g900, backgroundColor: C.white, marginBottom: 14,
+  newBadge: {
+    backgroundColor: C.danger, borderRadius: 4,
+    paddingHorizontal: 5, paddingVertical: 2,
   },
+  newBadgeText: { fontSize: 9, fontWeight: '800', color: C.white },
+
+  // Forms
   fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.g400, marginBottom: 6 },
+  input: {
+    padding: 12, borderWidth: 1.5, borderColor: C.g200,
+    borderRadius: 10, fontSize: 14, color: C.g900,
+    backgroundColor: C.white, marginBottom: 4,
+  },
   pillBtn: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999,
     borderWidth: 1.5, borderColor: C.g200, backgroundColor: C.white,
   },
-  pillBtnText: { fontSize: 13, fontWeight: '600', color: C.g500 },
+  pillBtnActive:     { borderColor: C.primary, backgroundColor: C.primaryLt },
+  pillBtnText:       { fontSize: 13, fontWeight: '600', color: C.g500 },
+  pillBtnTextActive: { color: C.primary },
+  condBtn: {
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  condBtnText: { fontSize: 13, fontWeight: '600' },
+
+  // Damage warning
+  dmgWarning: {
+    backgroundColor: '#fef2f2', borderRadius: 10,
+    borderWidth: 1, borderColor: '#fecaca',
+    padding: 12, marginBottom: 14,
+  },
+  dmgWarningText: { fontSize: 13, fontWeight: '700', color: C.danger, textAlign: 'center' },
+
+  // Buttons
   btnPrimary: {
-    backgroundColor: C.primary, borderRadius: 10, paddingVertical: 13,
-    paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center', elevation: 3,
+    backgroundColor: C.primary, borderRadius: 10,
+    paddingVertical: 13, paddingHorizontal: 20,
+    alignItems: 'center', justifyContent: 'center', elevation: 3,
   },
   btnPrimaryText: { color: C.white, fontSize: 14, fontWeight: '700' },
   btnSecondary: {
-    backgroundColor: C.g100, borderRadius: 10, paddingVertical: 13,
-    paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.g100, borderRadius: 10,
+    paddingVertical: 13, paddingHorizontal: 20,
+    alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: C.g200,
   },
   btnSecondaryText: { color: C.g700, fontSize: 14, fontWeight: '600' },
-  btnOutline: {
-    borderRadius: 10, paddingVertical: 12, paddingHorizontal: 20,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.white,
+
+  // Signatures
+  sigSection: {
+    backgroundColor: C.white, borderRadius: 12,
+    borderWidth: 1, borderColor: C.g200,
+    padding: 14, marginBottom: 14,
   },
-  btnOutlineText: { color: C.primary, fontSize: 14, fontWeight: '600' },
-  miniLabel: { fontSize: 10, color: C.g400, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4 },
-  miniVal:   { fontSize: 12, color: C.g700, fontWeight: '600', marginBottom: 2 },
   sigBox: {
-    backgroundColor: C.g50, borderRadius: 10, borderWidth: 1, borderColor: C.g200, padding: 12,
-    borderTopWidth: 3, borderTopColor: C.primary,
+    backgroundColor: C.g50, borderRadius: 10,
+    borderWidth: 1, borderColor: C.g200,
+    padding: 12, borderTopWidth: 3, borderTopColor: C.primary,
   },
-  sigLabel: { fontSize: 10, color: C.g400, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
-  sigName:  { fontSize: 14, color: C.g700, fontWeight: '600', fontStyle: 'italic' },
+
+  // Comments
+  commSection: {
+    backgroundColor: C.white, borderRadius: 12,
+    borderWidth: 1, borderColor: C.g200,
+    padding: 14, marginBottom: 14,
+  },
+  commentCard: {
+    borderLeftWidth: 3, borderRadius: 8,
+    backgroundColor: C.g50, padding: 12,
+    marginBottom: 10,
+  },
 });
