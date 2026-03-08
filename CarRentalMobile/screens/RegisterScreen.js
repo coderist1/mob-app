@@ -1,3 +1,4 @@
+// screens/RegisterScreen.js  – with AuthContext integration
 import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
@@ -5,6 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { useAuth } from '../context/AuthContext';   // ← NEW
 
 const C = {
   primary:   '#3F9B84', primaryDk: '#2d7a67', primaryLt: '#ecfdf5',
@@ -130,11 +132,9 @@ function DatePickerModal({ visible, onClose, onConfirm, currentDate }) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={dp.overlay}>
         <View style={dp.sheet}>
-          {/* Header */}
           <Text style={dp.title}>Date of Birth</Text>
           <Text style={dp.subtitle}>Must be 18 years or older to register</Text>
 
-          {/* Year row */}
           <View style={dp.navRow}>
             <TouchableOpacity onPress={prevYear} style={dp.navBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <ChevLeft color={year <= 1940 ? C.g300 : C.g600} />
@@ -145,7 +145,6 @@ function DatePickerModal({ visible, onClose, onConfirm, currentDate }) {
             </TouchableOpacity>
           </View>
 
-          {/* Month row */}
           <View style={dp.navRow}>
             <TouchableOpacity onPress={prevMonth} style={dp.navBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <ChevLeft />
@@ -156,14 +155,12 @@ function DatePickerModal({ visible, onClose, onConfirm, currentDate }) {
             </TouchableOpacity>
           </View>
 
-          {/* Day headers */}
           <View style={dp.weekRow}>
             {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
               <Text key={d} style={dp.weekDay}>{d}</Text>
             ))}
           </View>
 
-          {/* Day grid */}
           <View style={dp.grid}>
             {Array.from({ length: firstDayOfWeek }).map((_, i) => (
               <View key={`blank-${i}`} style={dp.cell} />
@@ -179,7 +176,6 @@ function DatePickerModal({ visible, onClose, onConfirm, currentDate }) {
             ))}
           </View>
 
-          {/* Actions */}
           <View style={dp.actions}>
             <TouchableOpacity style={dp.cancelBtn} onPress={onClose}>
               <Text style={dp.cancelText}>Cancel</Text>
@@ -223,16 +219,15 @@ const dp = StyleSheet.create({
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function RegisterScreen() {
   const router    = useRouter();
+  const { register } = useAuth();          // ← NEW
   const scrollRef = useRef(null);
 
-  // Input refs for focus chaining
   const lastNameInput  = useRef(null);
   const middleInput    = useRef(null);
   const emailInput     = useRef(null);
   const passwordInput  = useRef(null);
   const confirmInput   = useRef(null);
 
-  // Y positions stored from onLayout (relative to ScrollView content)
   const fieldY = useRef({});
 
   const scrollToField = (name) => {
@@ -251,30 +246,25 @@ export default function RegisterScreen() {
   });
   const [showPw,   setShowPw]   = useState(false);
   const [showCPw,  setShowCPw]  = useState(false);
-  const [showDob,  setShowDob]  = useState(false);
-  const [dobError, setDobError] = useState('');
   const [focused,  setFocused]  = useState(null);
-  const [error,    setError]    = useState('');
   const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
+  const [dobError, setDobError] = useState('');
+  const [showDob,  setShowDob]  = useState(false);
 
-  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); if (error) setError(''); };
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
-  const strength   = getStrength(form.password);
-  const pwMatch    = form.confirmPassword.length > 0 && form.password === form.confirmPassword;
-  const pwNoMatch  = form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
-
-  const formatDob = (d) => d
-    ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : '';
+  const formatDob = (d) => {
+    if (!d) return '';
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
 
   const handleDobConfirm = (date) => {
     setShowDob(false);
-    const today = new Date();
-    let age = today.getFullYear() - date.getFullYear();
-    const m = today.getMonth() - date.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < date.getDate())) age--;
-    if (age < 18) {
-      setDobError('You must be at least 18 years old to register.');
+    const today   = new Date();
+    const age18   = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    if (date > age18) {
+      setDobError('You must be at least 18 years old.');
       set('dob', null);
     } else {
       setDobError('');
@@ -282,6 +272,11 @@ export default function RegisterScreen() {
     }
   };
 
+  const strength = getStrength(form.password);
+  const pwMatch    = form.confirmPassword.length > 0 && form.password === form.confirmPassword;
+  const pwNoMatch  = form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
+
+  // ── UPDATED handleRegister ────────────────────────────────────────────────
   const handleRegister = () => {
     setError('');
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
@@ -291,9 +286,30 @@ export default function RegisterScreen() {
     if (!form.dob) { setError(dobError || 'Please select your date of birth.'); return; }
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
+
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+
+      // Build the user object and store it in AuthContext
+      const newUser = {
+        id:         Date.now().toString(),
+        role,
+        firstName:  form.firstName.trim(),
+        lastName:   form.lastName.trim(),
+        middleName: form.middleName.trim(),
+        fullName:   `${form.firstName.trim()} ${form.lastName.trim()}`,
+        email:      form.email.trim().toLowerCase(),
+        sex:        form.sex,
+        dob:        form.dob ? form.dob.toISOString() : null,
+        joinedAt:   new Date().toISOString(),
+        phone:      '',
+        avatar:     null,
+      };
+
+      register(newUser);   // ← Store user globally
+
+      // Navigate based on role
       router.replace(role === 'owner' ? '/dashboard' : '/renter');
     }, 1000);
   };
@@ -304,7 +320,6 @@ export default function RegisterScreen() {
     { key: 'prefer_not', label: 'Prefer not to say' },
   ];
 
-  // Reusable section heading
   const SectionHead = ({ title }) => (
     <View style={r.sectionHead}>
       <View style={r.sectionBar} />
@@ -364,46 +379,49 @@ export default function RegisterScreen() {
             </View>
           )}
 
-          {/* ── PERSONAL INFO ── */}
+          {/* Personal Information */}
           <SectionHead title="PERSONAL INFORMATION" />
 
-          {/* First + Last */}
+          {/* First + Last name row */}
           <View style={r.row2}>
             <View
               style={{ flex: 1, marginRight: 8 }}
-              onLayout={e => { fieldY.current['firstName'] = e.nativeEvent.layout.y + 420; }}
+              onLayout={e => { fieldY.current['first'] = e.nativeEvent.layout.y + 300; }}
             >
               <Text style={r.label}>First Name <Text style={{ color: C.danger }}>*</Text></Text>
-              <View style={[r.inputWrap, focused === 'fn' && r.inputFocused]}>
+              <View style={[r.inputWrap, r.inputRow, focused === 'first' && r.inputFocused]}>
                 <TextInput
-                  style={r.textInput}
-                  placeholder="First name"
+                  style={[r.textInput, { flex: 1 }]}
+                  placeholder="First"
                   placeholderTextColor={C.g300}
                   value={form.firstName}
-                  onChangeText={v => set('firstName', v)}
+                  onChangeText={v => { set('firstName', v); setError(''); }}
+                  autoCapitalize="words"
                   returnKeyType="next"
                   onSubmitEditing={() => lastNameInput.current?.focus()}
-                  onFocus={() => { setFocused('fn'); scrollToField('firstName'); }}
+                  onFocus={() => { setFocused('first'); scrollToField('first'); }}
                   onBlur={() => setFocused(null)}
                 />
               </View>
             </View>
+
             <View
-              style={{ flex: 1, marginLeft: 8 }}
-              onLayout={e => { fieldY.current['lastName'] = e.nativeEvent.layout.y + 420; }}
+              style={{ flex: 1 }}
+              onLayout={e => { fieldY.current['last'] = e.nativeEvent.layout.y + 300; }}
             >
               <Text style={r.label}>Last Name <Text style={{ color: C.danger }}>*</Text></Text>
-              <View style={[r.inputWrap, focused === 'ln' && r.inputFocused]}>
+              <View style={[r.inputWrap, r.inputRow, focused === 'last' && r.inputFocused]}>
                 <TextInput
                   ref={lastNameInput}
-                  style={r.textInput}
-                  placeholder="Last name"
+                  style={[r.textInput, { flex: 1 }]}
+                  placeholder="Last"
                   placeholderTextColor={C.g300}
                   value={form.lastName}
-                  onChangeText={v => set('lastName', v)}
+                  onChangeText={v => { set('lastName', v); setError(''); }}
+                  autoCapitalize="words"
                   returnKeyType="next"
                   onSubmitEditing={() => middleInput.current?.focus()}
-                  onFocus={() => { setFocused('ln'); scrollToField('lastName'); }}
+                  onFocus={() => { setFocused('last'); scrollToField('last'); }}
                   onBlur={() => setFocused(null)}
                 />
               </View>
@@ -411,19 +429,20 @@ export default function RegisterScreen() {
           </View>
 
           {/* Middle name */}
-          <View onLayout={e => { fieldY.current['middle'] = e.nativeEvent.layout.y + 420; }}>
-            <Text style={r.label}>Middle Name <Text style={r.optional}>(Optional)</Text></Text>
-            <View style={[r.inputWrap, focused === 'mn' && r.inputFocused]}>
+          <View onLayout={e => { fieldY.current['middle'] = e.nativeEvent.layout.y + 300; }}>
+            <Text style={r.label}>Middle Name <Text style={r.optional}>(optional)</Text></Text>
+            <View style={[r.inputWrap, r.inputRow, focused === 'middle' && r.inputFocused]}>
               <TextInput
                 ref={middleInput}
-                style={r.textInput}
-                placeholder="Optional"
+                style={[r.textInput, { flex: 1 }]}
+                placeholder="Middle name"
                 placeholderTextColor={C.g300}
                 value={form.middleName}
                 onChangeText={v => set('middleName', v)}
+                autoCapitalize="words"
                 returnKeyType="next"
                 onSubmitEditing={() => emailInput.current?.focus()}
-                onFocus={() => { setFocused('mn'); scrollToField('middle'); }}
+                onFocus={() => { setFocused('middle'); scrollToField('middle'); }}
                 onBlur={() => setFocused(null)}
               />
             </View>
@@ -432,34 +451,26 @@ export default function RegisterScreen() {
           {/* Sex */}
           <Text style={r.label}>Sex <Text style={{ color: C.danger }}>*</Text></Text>
           <View style={r.segRow}>
-            {SEX_OPTIONS.map(opt => (
-              <TouchableOpacity key={opt.key}
-                style={[r.segBtn, form.sex === opt.key && r.segBtnActive]}
-                onPress={() => set('sex', opt.key)}
+            {SEX_OPTIONS.map(o => (
+              <TouchableOpacity
+                key={o.key}
+                style={[r.segBtn, form.sex === o.key && r.segBtnActive]}
+                onPress={() => { set('sex', o.key); setError(''); }}
               >
-                <Text style={[r.segBtnText, form.sex === opt.key && r.segBtnTextActive]}>{opt.label}</Text>
+                <Text style={[r.segBtnText, form.sex === o.key && r.segBtnTextActive]}>{o.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {/* Date of Birth */}
-          <View style={{ marginTop: 18 }} onLayout={e => { fieldY.current['dob'] = e.nativeEvent.layout.y + 420; }}>
-            <Text style={r.label}>
-              Date of Birth <Text style={{ color: C.danger }}>*</Text>
-              <Text style={r.optional}>  (18+ only)</Text>
-            </Text>
+          <View style={{ marginTop: 16 }}>
+            <Text style={r.label}>Date of Birth <Text style={{ color: C.danger }}>*</Text></Text>
             <TouchableOpacity
-              style={[
-                r.dobBtn,
-                dobError   && r.dobBtnError,
-                form.dob   && r.dobBtnFilled,
-              ]}
-              onPress={() => { setShowDob(true); scrollToField('dob'); }}
+              style={[r.dobBtn, dobError ? r.dobBtnError : form.dob ? r.dobBtnFilled : null]}
+              onPress={() => setShowDob(true)}
               activeOpacity={0.8}
             >
-              <View style={r.iconBox}>
-                <CalendarIcon color={form.dob ? C.primary : dobError ? C.danger : C.g400} />
-              </View>
+              <View style={r.iconBox}><CalendarIcon color={dobError ? C.danger : form.dob ? C.primary : C.g400} /></View>
               <Text style={[r.dobText, !form.dob && r.dobPlaceholder, dobError && r.dobTextDanger]}>
                 {form.dob ? formatDob(form.dob) : 'Select date of birth'}
               </Text>
@@ -472,49 +483,48 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          {/* ── ACCOUNT INFO ── */}
-          <SectionHead title="ACCOUNT INFORMATION" />
+          {/* Account */}
+          <SectionHead title="ACCOUNT DETAILS" />
 
           {/* Email */}
-          <View onLayout={e => { fieldY.current['email'] = e.nativeEvent.layout.y + 420; }}>
+          <View onLayout={e => { fieldY.current['email'] = e.nativeEvent.layout.y + 300; }}>
             <Text style={r.label}>Email Address <Text style={{ color: C.danger }}>*</Text></Text>
-            <View style={[r.inputWrap, r.inputRow, focused === 'em' && r.inputFocused]}>
-              <View style={r.iconBox}><MailIcon color={focused === 'em' ? C.primary : C.g400} /></View>
+            <View style={[r.inputWrap, r.inputRow, focused === 'email' && r.inputFocused]}>
+              <View style={r.iconBox}>
+                <MailIcon color={focused === 'email' ? C.primary : C.g400} />
+              </View>
               <TextInput
                 ref={emailInput}
                 style={[r.textInput, { flex: 1 }]}
                 placeholder="name@example.com"
                 placeholderTextColor={C.g300}
                 value={form.email}
-                onChangeText={v => set('email', v)}
+                onChangeText={v => { set('email', v); setError(''); }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
                 onSubmitEditing={() => passwordInput.current?.focus()}
-                onFocus={() => { setFocused('em'); scrollToField('email'); }}
+                onFocus={() => { setFocused('email'); scrollToField('email'); }}
                 onBlur={() => setFocused(null)}
               />
             </View>
           </View>
 
-          {/* Password hint */}
-          <View style={r.hintBox}>
-            <Text style={r.hintText}>Min. 8 characters — include uppercase, lowercase, numbers &amp; symbols.</Text>
-          </View>
-
           {/* Password */}
-          <View onLayout={e => { fieldY.current['password'] = e.nativeEvent.layout.y + 420; }}>
+          <View onLayout={e => { fieldY.current['password'] = e.nativeEvent.layout.y + 300; }}>
             <Text style={r.label}>Password <Text style={{ color: C.danger }}>*</Text></Text>
             <View style={[r.inputWrap, r.inputRow, focused === 'pw' && r.inputFocused]}>
-              <View style={r.iconBox}><LockIcon color={focused === 'pw' ? C.primary : C.g400} /></View>
+              <View style={r.iconBox}>
+                <LockIcon color={focused === 'pw' ? C.primary : C.g400} />
+              </View>
               <TextInput
                 ref={passwordInput}
                 style={[r.textInput, { flex: 1 }]}
                 placeholder="Min. 8 characters"
                 placeholderTextColor={C.g300}
                 value={form.password}
-                onChangeText={v => set('password', v)}
+                onChangeText={v => { set('password', v); setError(''); }}
                 secureTextEntry={!showPw}
                 returnKeyType="next"
                 onSubmitEditing={() => confirmInput.current?.focus()}
@@ -525,7 +535,8 @@ export default function RegisterScreen() {
                 {showPw ? <EyeOffIcon /> : <EyeIcon />}
               </TouchableOpacity>
             </View>
-            {!!form.password && (
+            {/* Strength */}
+            {form.password.length > 0 && (
               <View style={r.strengthWrap}>
                 <View style={r.strengthTrack}>
                   <View style={[r.strengthBar, { width: strength.pct, backgroundColor: strength.color }]} />
@@ -536,7 +547,7 @@ export default function RegisterScreen() {
           </View>
 
           {/* Confirm Password */}
-          <View style={{ marginTop: 16 }} onLayout={e => { fieldY.current['confirm'] = e.nativeEvent.layout.y + 420; }}>
+          <View onLayout={e => { fieldY.current['confirm'] = e.nativeEvent.layout.y + 300; }}>
             <Text style={r.label}>Confirm Password <Text style={{ color: C.danger }}>*</Text></Text>
             <View style={[
               r.inputWrap, r.inputRow,
@@ -663,9 +674,6 @@ const r = StyleSheet.create({
 
   inlineError:     { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
   inlineErrorText: { fontSize: 12, color: C.danger, fontWeight: '600' },
-
-  hintBox: { backgroundColor: C.g50, borderRadius: 8, padding: 10, marginBottom: 16, borderLeftWidth: 3, borderLeftColor: C.primary },
-  hintText: { fontSize: 12, color: C.g500, lineHeight: 18 },
 
   strengthWrap:  { marginTop: 8, marginBottom: 4 },
   strengthTrack: { height: 4, backgroundColor: C.g200, borderRadius: 2, overflow: 'hidden', marginBottom: 4 },

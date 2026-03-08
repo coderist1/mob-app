@@ -4,6 +4,8 @@ import {
   StyleSheet, Modal, FlatList, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
+import ProfileAvatar from '../components/ProfileAvatar';
 
 const C = {
   primary:   '#3F9B84',
@@ -87,6 +89,7 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
 
 export default function OwnerDashboardScreen() {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [vehicles,    setVehicles]    = useState(INITIAL_VEHICLES);
   const [rentals,     setRentals]     = useState(INITIAL_RENTALS);
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,7 +105,7 @@ export default function OwnerDashboardScreen() {
 
   const setF = (k, v) => setFormData(p => ({ ...p, [k]: v }));
 
-  const userName = 'Owner';
+  const userName = user?.firstName || user?.fullName || 'Owner';
 
   const stats = {
     total:     vehicles.length,
@@ -282,9 +285,9 @@ export default function OwnerDashboardScreen() {
 
       {/* ── HEADER ── */}
       <View style={s.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>Owner Dashboard</Text>
-          <Text style={s.headerSub}>Manage your fleet</Text>
+          <Text style={s.headerSub}>Welcome back, {userName} 👋</Text>
         </View>
         <View style={s.headerActions}>
           <TouchableOpacity style={s.headerBtn} onPress={() => setShowHistory(true)}>
@@ -293,9 +296,7 @@ export default function OwnerDashboardScreen() {
           <TouchableOpacity style={s.headerBtnPrimary} onPress={() => { resetForm(); setShowAddModal(true); }}>
             <Text style={s.headerBtnPrimaryText}>+ Add</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.replace('/login')}>
-            <Text style={s.logoutBtn}>Logout</Text>
-          </TouchableOpacity>
+          <ProfileAvatar size={38} />
         </View>
       </View>
 
