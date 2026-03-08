@@ -1,3 +1,3 @@
-// app/profile.js  –  Profile route (owner & renter share the same screen)
+// app/profile.js  –  Profile screen route
 import ProfileScreen from '../screens/ProfileScreen';
 export default ProfileScreen;
