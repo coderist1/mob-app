@@ -125,9 +125,10 @@ export default function LoginScreen() {
       setLoading(false);
       const e = email.trim().toLowerCase();
       const demoUser = DEMO_USERS[e];
+      const demoEntry = DEMO.find(d => d.email === e);
 
-      if (demoUser) {
-        login(demoUser);   // ← Store user in context
+      if (demoUser && demoEntry && demoEntry.pass === password.trim()) {
+        login({ ...demoUser, password: password.trim() });   // ← Store user in context
         // route according to the user's role rather than email
         switch (demoUser.role) {
           case 'owner':
