@@ -300,6 +300,7 @@ export default function RegisterScreen() {
         middleName: form.middleName.trim(),
         fullName:   `${form.firstName.trim()} ${form.lastName.trim()}`,
         email:      form.email.trim().toLowerCase(),
+        password:   form.password.trim(),
         sex:        form.sex,
         dob:        form.dob ? form.dob.toISOString() : null,
         joinedAt:   new Date().toISOString(),
