@@ -224,7 +224,7 @@ export default function AdminDashboard() {
           {profileMenuOpen && (
             <View style={s.profileMenu}>
               <TouchableOpacity style={s.profileMenuItem} onPress={onProfile}>
-                <Text style={s.profileMenuText}>My Profile</Text>
+                <Text style={s.profileMenuText}>My Profile</Text>git
               </TouchableOpacity>
               <TouchableOpacity style={s.profileMenuItem} onPress={onLogout}>
                 <Text style={[s.profileMenuText, s.logoutText]}>Logout</Text>
