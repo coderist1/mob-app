@@ -134,7 +134,8 @@ function FieldRow({ icon, label, value, placeholder = '—' }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, updateUser, logout } = useAuth();
+  const { user, updateUser, logout, changePassword } = useAuth();
+  const [showChangePw,  setShowChangePw]  = useState(false);
 
   // Fallback so screen doesn't crash if visited without auth (demo)
   const u = user || {
@@ -474,7 +475,7 @@ export default function ProfileScreen() {
 
             <View style={p.divider} />
 
-            <TouchableOpacity style={p.quickItem} onPress={() => {}}>
+            <TouchableOpacity style={p.quickItem} onPress={() => setShowChangePw(true)}>
               <View style={[p.quickIcon, { backgroundColor: 'rgba(245,158,11,0.1)' }]}>
                 <IconLock size={16} color={C.warning} />
               </View>
@@ -532,9 +533,148 @@ export default function ProfileScreen() {
         )}
 
       </ScrollView>
+
+      {/* ── CHANGE PASSWORD MODAL ── */}
+      <ChangePasswordModal
+        visible={showChangePw}
+        onClose={() => setShowChangePw(false)}
+        changePassword={changePassword}
+      />
     </View>
   );
 }
+
+// ── Change Password Modal ─────────────────────────────────────────────────────
+function ChangePasswordModal({ visible, onClose, changePassword }) {
+  const [currentPw,  setCurrentPw]  = useState('');
+  const [newPw,      setNewPw]      = useState('');
+  const [confirmPw,  setConfirmPw]  = useState('');
+  const [showCur,    setShowCur]    = useState(false);
+  const [showNew,    setShowNew]    = useState(false);
+  const [showConf,   setShowConf]   = useState(false);
+
+  React.useEffect(() => {
+    if (visible) { setCurrentPw(''); setNewPw(''); setConfirmPw(''); }
+  }, [visible]);
+
+  const handleSave = () => {
+    if (!currentPw || !newPw || !confirmPw) {
+      Alert.alert('Required', 'Please fill in all fields.');
+      return;
+    }
+    if (newPw.length < 6) {
+      Alert.alert('Too short', 'New password must be at least 6 characters.');
+      return;
+    }
+    if (newPw !== confirmPw) {
+      Alert.alert('Mismatch', 'New password and confirmation do not match.');
+      return;
+    }
+    const result = changePassword(currentPw, newPw);
+    if (result.success) {
+      Alert.alert('Success ✓', result.message, [{ text: 'OK', onPress: onClose }]);
+    } else {
+      Alert.alert('Error', result.message);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={{ flex: 1, backgroundColor: C.white }}>
+        {/* Header */}
+        <View style={cp.header}>
+          <Text style={cp.title}>Change Password</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={cp.close}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={cp.body} keyboardShouldPersistTaps="handled">
+          {/* Current Password */}
+          <Text style={cp.label}>Current Password</Text>
+          <View style={cp.pwRow}>
+            <TextInput
+              style={cp.pwInput}
+              placeholder="Enter current password"
+              placeholderTextColor={C.g300}
+              secureTextEntry={!showCur}
+              value={currentPw}
+              onChangeText={setCurrentPw}
+            />
+            <TouchableOpacity onPress={() => setShowCur(v => !v)} style={cp.eyeBtn}>
+              <IconLock size={16} color={showCur ? C.primary : C.g400} />
+            </TouchableOpacity>
+          </View>
+
+          {/* New Password */}
+          <Text style={cp.label}>New Password</Text>
+          <View style={cp.pwRow}>
+            <TextInput
+              style={cp.pwInput}
+              placeholder="Minimum 6 characters"
+              placeholderTextColor={C.g300}
+              secureTextEntry={!showNew}
+              value={newPw}
+              onChangeText={setNewPw}
+            />
+            <TouchableOpacity onPress={() => setShowNew(v => !v)} style={cp.eyeBtn}>
+              <IconLock size={16} color={showNew ? C.primary : C.g400} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Confirm Password */}
+          <Text style={cp.label}>Confirm New Password</Text>
+          <View style={[cp.pwRow, { marginBottom: 32 }]}>
+            <TextInput
+              style={cp.pwInput}
+              placeholder="Re-enter new password"
+              placeholderTextColor={C.g300}
+              secureTextEntry={!showConf}
+              value={confirmPw}
+              onChangeText={setConfirmPw}
+            />
+            <TouchableOpacity onPress={() => setShowConf(v => !v)} style={cp.eyeBtn}>
+              <IconLock size={16} color={showConf ? C.primary : C.g400} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={cp.saveBtn} onPress={handleSave}>
+            <Text style={cp.saveBtnText}>Change Password</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={cp.cancelBtn} onPress={onClose}>
+            <Text style={cp.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+const cp = StyleSheet.create({
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 20, borderBottomWidth: 1, borderBottomColor: C.g200,
+  },
+  title:  { fontSize: 18, fontWeight: '700', color: C.navy },
+  close:  { fontSize: 22, color: C.g400 },
+  body:   { padding: 20 },
+  label:  { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.g400, marginBottom: 8, marginTop: 4 },
+  pwRow:  {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderColor: C.g200, borderRadius: 11,
+    backgroundColor: C.g50, paddingHorizontal: 13,
+    marginBottom: 16,
+  },
+  pwInput: { flex: 1, paddingVertical: 13, fontSize: 14, color: C.g800, fontWeight: '500' },
+  eyeBtn: { padding: 6 },
+  saveBtn: {
+    backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: C.primary, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 5,
+  },
+  saveBtnText:   { color: C.white, fontSize: 14, fontWeight: '700' },
+  cancelBtn:     { borderWidth: 1.5, borderColor: C.g200, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 10 },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', color: C.g600 },
+});
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const p = StyleSheet.create({
