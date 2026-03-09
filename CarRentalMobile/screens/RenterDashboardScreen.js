@@ -72,7 +72,6 @@ function VehicleCard({ vehicle, onRent }) {
   );
 }
 
-/* ─── RENT MODAL ─── */
 function RentModal({ visible, vehicle, onClose, onConfirm }) {
   const [startDate, setStart] = useState('');
   const [endDate,   setEnd]   = useState('');
