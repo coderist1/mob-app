@@ -497,4 +497,9 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', elevation: 3,
   },
   btnPrimaryText: { color: C.white, fontSize: 14, fontWeight: '700' },
+  pwWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 12, borderWidth: 1.5, borderColor: C.g200, borderRadius: 10,
+    backgroundColor: C.white,
+  },
 });
