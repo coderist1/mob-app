@@ -488,4 +488,9 @@ const s = StyleSheet.create({
   btnPrimary:  { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: C.white, fontSize: 14, fontWeight: '700' },
   btnDanger:   { backgroundColor: C.danger, borderRadius: 10, paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
+  pwWrap: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 12, borderWidth: 1.5, borderColor: C.g200, borderRadius: 10,
+    backgroundColor: C.white,
+  },
 });
