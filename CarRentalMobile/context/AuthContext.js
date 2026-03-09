@@ -22,8 +22,21 @@ export function AuthProvider({ children }) {
   const updateUser = (partial) =>
     setUser((prev) => (prev ? { ...prev, ...partial } : prev));
 
+  /**
+   * Change password (demo — no backend).
+   * Returns { success: boolean, message: string }.
+   */
+  const changePassword = (currentPassword, newPassword) => {
+    if (!user) return { success: false, message: 'Not logged in.' };
+    if (user.password && user.password !== currentPassword) {
+      return { success: false, message: 'Current password is incorrect.' };
+    }
+    setUser((prev) => (prev ? { ...prev, password: newPassword } : prev));
+    return { success: true, message: 'Password changed successfully.' };
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, login, register, logout, updateUser, changePassword }}>
       {children}
     </AuthContext.Provider>
   );
