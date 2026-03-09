@@ -181,6 +181,11 @@ function HomeTab({ userName, vehicles, myRentals }) {
   const openRent = v => { setSelVehicle(v); setRentModal(true); };
 
   const handleConfirmRent = data => {
+    if (!selVehicle) {
+      // defensive: nothing selected, shouldn't happen
+      Alert.alert('Error', 'No vehicle selected. Please try again.');
+      return;
+    }
     const newBooking = {
       id: `rent-${Date.now()}`,
       vehicleId:   selVehicle.id,
@@ -373,6 +378,14 @@ function BookingsTab() {
 export default function RenterDashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
+
+  // if somehow this screen is shown without an authenticated user
+  // (race condition during login or manual deep link), kick back to login
+  React.useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+    }
+  }, [user]);
 
   const [activeTab, setActiveTab] = useState('home');
 

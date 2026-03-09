@@ -309,8 +309,17 @@ export default function RegisterScreen() {
 
       register(newUser);   // ← Store user globally
 
-      // Navigate based on role
-      router.replace(role === 'owner' ? '/dashboard' : '/renter');
+      // Navigate based on role (switch makes intent explicit)
+      switch (role) {
+        case 'owner':
+          router.replace('/dashboard');
+          break;
+        case 'renter':
+          router.replace('/renter');
+          break;
+        default:
+          router.replace('/login');
+      }
     }, 1000);
   };
 

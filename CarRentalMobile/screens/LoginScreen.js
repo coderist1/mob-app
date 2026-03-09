@@ -128,9 +128,21 @@ export default function LoginScreen() {
 
       if (demoUser) {
         login(demoUser);   // ← Store user in context
-        if      (e === 'owner@test.com')  router.replace('/dashboard');
-        else if (e === 'admin@test.com')  router.replace('/admin');
-        else if (e === 'renter@test.com') router.replace('/renter');
+        // route according to the user's role rather than email
+        switch (demoUser.role) {
+          case 'owner':
+            router.replace('/dashboard');
+            break;
+          case 'renter':
+            router.replace('/renter');
+            break;
+          case 'admin':
+            router.replace('/admin');
+            break;
+          default:
+            // fallback just in case
+            router.replace('/login');
+        }
       } else {
         setError('Invalid email or password. Please try again.');
       }
