@@ -38,7 +38,6 @@ const DEMO_VEHICLES = [
 ];
 
 
-/* ─── Vehicle Card ─── */
 function VehicleCard({ vehicle, onRent }) {
   const available = vehicle.status === 'available';
   return (
