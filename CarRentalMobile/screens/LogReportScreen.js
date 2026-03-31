@@ -9,6 +9,7 @@ import {
   Modal, StyleSheet, Alert, Platform, Image,
 } from 'react-native';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useLogReport } from '../context/LogReportContext';
 
@@ -80,6 +81,18 @@ const Ic = {
     <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <Path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
       <Circle cx="7" cy="17" r="2" /><Path d="M9 17h6" /><Circle cx="17" cy="17" r="2" />
+    </Svg>
+  ),
+  Image: ({ s = 18, c = C.g400 }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="3" y="3" width="18" height="18" rx="2" />
+      <Circle cx="8.5" cy="8.5" r="1.5" />
+      <Path d="M21 15l-5-5L5 21" />
+    </Svg>
+  ),
+  X: ({ s = 10, c = C.white }) => (
+    <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M18 6L6 18M6 6l12 12" />
     </Svg>
   ),
 };
@@ -244,6 +257,108 @@ function ChecklistEditor({ issues, onChange, isCheckout = false, checkinIssues =
   );
 }
 
+
+/* ═══════════════════════════════════════════
+   PHOTO UPLOADER
+═══════════════════════════════════════════ */
+function PhotoUploader({ photos = [], onChange, label = 'Condition Photos' }) {
+  const requestPermission = async (type) => {
+    if (type === 'camera') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+        return false;
+      }
+    } else {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Gallery access is needed to select photos.');
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const addPhoto = () => {
+    Alert.alert('Add Photo', 'Choose a source', [
+      { text: 'Camera', onPress: async () => {
+        const ok = await requestPermission('camera');
+        if (!ok) return;
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.7,
+        });
+        if (!result.canceled && result.assets?.[0]?.uri) {
+          onChange([...photos, result.assets[0].uri]);
+        }
+      }},
+      { text: 'Gallery', onPress: async () => {
+        const ok = await requestPermission('gallery');
+        if (!ok) return;
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsMultipleSelection: true,
+          quality: 0.7,
+        });
+        if (!result.canceled && result.assets?.length > 0) {
+          onChange([...photos, ...result.assets.map(a => a.uri)]);
+        }
+      }},
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const removePhoto = (index) => {
+    Alert.alert('Remove Photo?', '', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => onChange(photos.filter((_, i) => i !== index)) },
+    ]);
+  };
+
+  return (
+    <View style={{ marginBottom: 18 }}>
+      <SectionHeader title={label} />
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {/* Existing photos */}
+        {photos.map((uri, i) => (
+          <View key={i} style={{ position: 'relative' }}>
+            <Image
+              source={{ uri }}
+              style={{ width: 86, height: 86, borderRadius: 10, borderWidth: 1, borderColor: C.g200 }}
+              resizeMode="cover"
+            />
+            <TouchableOpacity
+              onPress={() => removePhoto(i)}
+              style={{
+                position: 'absolute', top: -6, right: -6,
+                width: 22, height: 22, borderRadius: 11,
+                backgroundColor: C.danger,
+                borderWidth: 2, borderColor: C.white,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+              <Ic.X s={10} c={C.white} />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {/* Add Photo button */}
+        <TouchableOpacity onPress={addPhoto}
+          style={{
+            width: 86, height: 86, borderRadius: 10,
+            borderWidth: 1.5, borderColor: C.g300,
+            borderStyle: 'dashed', backgroundColor: C.g50,
+            alignItems: 'center', justifyContent: 'center', gap: 4,
+          }}>
+          <Ic.Image s={22} c={C.g400} />
+          <Text style={{ fontSize: 11, color: C.g400, fontWeight: '600' }}>Add Photo</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 /* ═══════════════════════════════════════════
    REPORT FORM  (check-in OR check-out)
 ═══════════════════════════════════════════ */
@@ -352,7 +467,14 @@ function ReportForm({ initial = {}, onSave, onCancel, isCheckout = false, checki
         />
       </View>
 
-      {/* 5 — Damage cost (checkout only) */}
+      {/* 5 — Photos */}
+      <PhotoUploader
+        photos={photos}
+        onChange={setPhotos}
+        label={isCheckout ? 'Check-out Photos (After Trip)' : 'Check-in Photos (Before Trip)'}
+      />
+
+      {/* 6 — Damage cost (checkout only) */}
       {isCheckout && (
         <View style={{ marginBottom: 18 }}>
           <SectionHeader title="Damage Assessment" />
@@ -516,6 +638,24 @@ function ConditionColumn({ title, data, newIssues = [], onEdit, isOwner }) {
         <View style={st.miniField}>
           <Text style={st.miniLabel}>Notes</Text>
           <Text style={{ fontSize: 12, color: C.g700, lineHeight: 18 }}>{data.notes}</Text>
+        </View>
+      )}
+      {/* Photos */}
+      {data.photos && data.photos.length > 0 && (
+        <View style={st.miniField}>
+          <Text style={st.miniLabel}>Photos ({data.photos.length})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={{ flexDirection: 'row', gap: 6, paddingVertical: 4 }}>
+              {data.photos.map((uri, i) => (
+                <Image
+                  key={i}
+                  source={{ uri }}
+                  style={{ width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: C.g200 }}
+                  resizeMode="cover"
+                />
+              ))}
+            </View>
+          </ScrollView>
         </View>
       )}
     </View>
