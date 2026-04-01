@@ -1,54 +1,97 @@
-// context/AuthContext.js
-// Global auth state — wraps the whole app so any screen can read/write the
-// current user without prop-drilling or AsyncStorage for this demo.
-//
-// Added: `photoUri` field on the user object + dedicated `updatePhoto` helper
-// that sets / clears the profile picture URI.
-
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AuthContext = createContext(null);
+const USER_STORAGE_KEY = 'auth_user_data';
+const PHOTO_KEY_PREFIX = 'profile_photo_';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [state, setState] = useState({
+    user: null,
+    status: 'loading', 
+  });
 
-  /** Call this after a successful login (demo only — no real backend). */
-  const login = (userData) =>
-    setUser({ photoUri: null, ...userData });
+  // 1. Bootstrap: Check for existing session on app launch
+  useEffect(() => {
+    const bootstrapAsync = async () => {
+      try {
+        const savedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+        if (savedUser) {
+          const userData = JSON.parse(savedUser);
+          // Optional: Fetch latest profile photo from storage here
+          const photoUri = await AsyncStorage.getItem(`${PHOTO_KEY_PREFIX}${userData.id}`);
+          
+          setState({ 
+            user: { ...userData, photoUri: photoUri || userData.photoUri }, 
+            status: 'authenticated' 
+          });
+        } else {
+          setState({ user: null, status: 'idle' });
+        }
+      } catch (e) {
+        console.error("Auth Bootstrap Error:", e);
+        setState({ user: null, status: 'idle' });
+      }
+    };
 
-  /** Call this after a successful registration. */
-  const register = (userData) =>
-    setUser({ photoUri: null, ...userData });
+    bootstrapAsync();
+  }, []);
 
-  /** Wipe the session and go back to login. */
-  const logout = () => setUser(null);
+  // 2. Login: Handles persistence and state update
+  const login = useCallback(async (userData) => {
+    // Set loading to prevent UI interaction during async work
+    setState(prev => ({ ...prev, status: 'loading' }));
 
-  /** Merge partial updates into the current user object (e.g. from ProfileScreen). */
-  const updateUser = (partial) =>
-    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+    try {
+      if (!userData?.id) throw new Error("Invalid user data");
 
-  /**
-   * Set or clear the profile photo.
-   * Pass a local URI string (from expo-image-picker) to set it,
-   * or null / undefined to remove it.
-   *
-   * @param {string|null} uri
-   */
-  const updatePhoto = (uri) =>
-    setUser((prev) => (prev ? { ...prev, photoUri: uri ?? null } : prev));
+      const photoUri = await AsyncStorage.getItem(`${PHOTO_KEY_PREFIX}${userData.id}`);
+      const finalUser = { ...userData, photoUri: photoUri || userData.photoUri || null };
+
+      // Persist the session
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(finalUser));
+
+      setState({
+        user: finalUser,
+        status: 'authenticated'
+      });
+    } catch (error) {
+      console.error("Login Error:", error);
+      setState({ user: null, status: 'idle' });
+    }
+  }, []);
+
+  // 3. Logout: Clears storage and resets state
+  const logout = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    } catch (e) {
+      console.error("Logout Error:", e);
+    } finally {
+      // Always reset state even if storage removal fails
+      setState({ user: null, status: 'idle' });
+    }
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, login, register, logout, updateUser, updatePhoto }}
+      value={{ 
+        user: state.user, 
+        isLoading: state.status === 'loading', 
+        isAuthenticated: state.status === 'authenticated', 
+        login, 
+        logout 
+      }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
 
-/** Convenience hook — throws if used outside <AuthProvider>. */
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 }
