@@ -4,7 +4,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Platform, StatusBar, Modal, KeyboardAvoidingView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';   // ← NEW
@@ -279,7 +279,7 @@ export default function RegisterScreen() {
   const pwNoMatch  = form.confirmPassword.length > 0 && form.password !== form.confirmPassword;
 
   // ── UPDATED handleRegister ────────────────────────────────────────────────
-  const handleRegister = () => {
+  const handleRegister = async () => {
     setError('');
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
       setError('Please fill in all required fields.'); return;
@@ -290,39 +290,41 @@ export default function RegisterScreen() {
     if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
 
-      // Build the user object and store it in AuthContext
-      const newUser = {
-        id:         Date.now().toString(),
-        role,
-        firstName:  form.firstName.trim(),
-        lastName:   form.lastName.trim(),
-        middleName: form.middleName.trim(),
-        fullName:   `${form.firstName.trim()} ${form.lastName.trim()}`,
-        email:      form.email.trim().toLowerCase(),
-        sex:        form.sex,
-        dob:        form.dob ? form.dob.toISOString() : null,
-        joinedAt:   new Date().toISOString(),
-        phone:      '',
-        avatar:     null,
-      };
+    const newUser = {
+      id:         Date.now().toString(),
+      role,
+      firstName:  form.firstName.trim(),
+      lastName:   form.lastName.trim(),
+      middleName: form.middleName.trim(),
+      fullName:   `${form.firstName.trim()} ${form.lastName.trim()}`,
+      email:      form.email.trim().toLowerCase(),
+      sex:        form.sex,
+      dob:        form.dob ? form.dob.toISOString() : null,
+      joinedAt:   new Date().toISOString(),
+      phone:      '',
+      avatar:     null,
+      photoUri:   null,
+    };
 
-      register(newUser);   // ← Store user globally
+    const result = await register(newUser, form.password);
+    setLoading(false);
+    if (!result.ok) {
+      setError(result.error || 'Registration failed. Please try again.');
+      return;
+    }
 
-      // Navigate based on role (switch makes intent explicit)
-      switch (role) {
-        case 'owner':
-          router.replace('/dashboard');
-          break;
-        case 'renter':
-          router.replace('/renter');
-          break;
-        default:
-          router.replace('/login');
-      }
-    }, 1000);
+    switch (role) {
+      case 'owner':
+        router.replace('/dashboard');
+        break;
+      case 'renter':
+        router.replace('/renter');
+        break;
+      default:
+        router.replace('/login');
+        break;
+    }
   };
 
   const SEX_OPTIONS = [
@@ -339,15 +341,16 @@ export default function RegisterScreen() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.navy }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={insets.top + 10}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.navy }} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: C.navy }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top + 10}
+      >
+        <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      <ScrollView
-        ref={scrollRef}
+        <ScrollView
+          ref={scrollRef}
         contentContainerStyle={[r.scroll, { paddingBottom: Math.max(160, insets.bottom + 40) }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -625,7 +628,8 @@ export default function RegisterScreen() {
         onConfirm={handleDobConfirm}
         currentDate={form.dob}
       />
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

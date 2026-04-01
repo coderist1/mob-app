@@ -4,7 +4,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Platform, StatusBar, KeyboardAvoidingView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';   // ← NEW
@@ -58,42 +58,6 @@ const ArrowIcon = () => (
   </Svg>
 );
 
-// ── Demo users (simulate a user DB) ──────────────────────────────────────────
-const DEMO_USERS = {
-  'owner@test.com': {
-    id: 'u_owner', role: 'owner',
-    firstName: 'Alex', lastName: 'Reyes', middleName: 'B.',
-    fullName: 'Alex Reyes', email: 'owner@test.com',
-    sex: 'male', dob: '1990-05-15T00:00:00.000Z',
-    phone: '+63 912 345 6789',
-    joinedAt: '2024-01-10T00:00:00.000Z',
-    avatar: null,
-  },
-  'renter@test.com': {
-    id: 'u_renter', role: 'renter',
-    firstName: 'Maria', lastName: 'Santos', middleName: 'C.',
-    fullName: 'Maria Santos', email: 'renter@test.com',
-    sex: 'female', dob: '1995-08-22T00:00:00.000Z',
-    phone: '+63 917 654 3210',
-    joinedAt: '2024-03-01T00:00:00.000Z',
-    avatar: null,
-  },
-  'admin@test.com': {
-    id: 'u_admin', role: 'admin',
-    firstName: 'Admin', lastName: 'User', middleName: '',
-    fullName: 'Admin User', email: 'admin@test.com',
-    sex: '', dob: null, phone: '',
-    joinedAt: '2023-01-01T00:00:00.000Z',
-    avatar: null,
-  },
-};
-
-const DEMO = [
-  { label: 'Owner',  email: 'owner@test.com',  pass: 'password' },
-  { label: 'Renter', email: 'renter@test.com', pass: 'password' },
-  { label: 'Admin',  email: 'admin@test.com',  pass: 'admin123' },
-];
-
 export default function LoginScreen() {
   const router    = useRouter();
   const { login } = useAuth();   // ← NEW
@@ -119,47 +83,45 @@ export default function LoginScreen() {
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError('');
     if (!email.trim() || !password.trim()) { setError('Please fill in all fields.'); return; }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const e = email.trim().toLowerCase();
-      const demoUser = DEMO_USERS[e];
+    const result = await login(email, password);
+    setLoading(false);
 
-      if (demoUser) {
-        login(demoUser);   // ← Store user in context
-        // route according to the user's role rather than email
-        switch (demoUser.role) {
-          case 'owner':
-            router.replace('/dashboard');
-            break;
-          case 'renter':
-            router.replace('/renter');
-            break;
-          case 'admin':
-            router.replace('/admin');
-            break;
-          default:
-            // fallback just in case
-            router.replace('/login');
-        }
-      } else {
-        setError('Invalid email or password. Please try again.');
+    if (!result.ok) {
+      setError(result.error || 'Invalid email or password. Please try again.');
+      return;
+    }
+
+    switch (result.user.role) {
+      case 'owner':
+        router.replace('/dashboard');
+        break;
+      case 'renter':
+        router.replace('/renter');
+        break;
+      case 'admin':
+        router.replace('/admin');
+        break;
+      default:
+        setError('This account has an unknown role.');
+        router.replace('/login');
+        break;
       }
-    }, 1000);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.navy }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={insets.top + 10}
-    >
-      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.navy }} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: C.navy }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top + 10}
+      >
+        <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-      <ScrollView
+        <ScrollView
         ref={scrollRef}
         contentContainerStyle={[s.scroll, { paddingBottom: Math.max(160, insets.bottom + 40) }]}
         keyboardShouldPersistTaps="handled"
@@ -173,15 +135,6 @@ export default function LoginScreen() {
           <View style={s.logoBox}><CarIcon size={28} color={C.primary} /></View>
           <Text style={s.heroTitle}>Welcome Back</Text>
           <Text style={s.heroSub}>Sign in to continue to CarRental</Text>
-          <Text style={s.demoHeading}>TAP TO AUTO-FILL DEMO CREDENTIALS</Text>
-          <View style={s.demoRow}>
-            {DEMO.map(d => (
-              <TouchableOpacity key={d.label} style={s.demoChip}
-                onPress={() => { setEmail(d.email); setPassword(d.pass); setError(''); }}>
-                <Text style={s.demoChipText}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
 
         {/* ── FORM CARD ── */}
@@ -284,7 +237,8 @@ export default function LoginScreen() {
 
         <View style={{ height: 120 }} />
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
