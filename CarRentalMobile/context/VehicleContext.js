@@ -44,7 +44,6 @@ const fromApiVehicle = (vehicle) => {
   let parsedOwnerId = vehicle.ownerId ?? vehicle.owner_id ?? vehicle.userId ?? vehicle.user_id ?? null;
   let parsedOwnerName = vehicle.ownerName ?? vehicle.userName ?? '';
 
-  // Safely extract the owner ID if the backend sends it simply as 'owner'
   const ownerData = vehicle.owner ?? vehicle.user;
   if (ownerData !== undefined && ownerData !== null) {
     if (typeof ownerData === 'object') {
@@ -69,39 +68,112 @@ const fromApiVehicle = (vehicle) => {
     status,
     ownerId: parsedOwnerId,
     ownerName: parsedOwnerName || 'Unknown Owner',
+    // Preserve all fields the form sends
+    type:         vehicle.type         || vehicle.vehicle_type || '',
+    transmission: vehicle.transmission || '',
+    fuel:         vehicle.fuel         || '',
+    seats:        vehicle.seats        ?? null,
+    location:     vehicle.location     || '',
+    description:  vehicle.description  || '',
+    brand:        vehicle.brand        || '',
   };
 };
 
+// ── toApiVehicle: build POST payload — all fields the form can send ───────────
 const toApiVehicle = (vehicleData) => {
   const rawPrice = Number(vehicleData.pricePerDay ?? vehicleData.price ?? vehicleData.daily_rate ?? 0);
   const payload = {
-    name: vehicleData.name || vehicleData.model || 'Unknown Vehicle',
-    brand: vehicleData.brand || 'Unknown Brand',
-    model: vehicleData.model || vehicleData.name || 'Unknown Model',
-    year: Number(vehicleData.year || new Date().getFullYear()),
-    price: Number.isNaN(rawPrice) ? 0 : rawPrice,
-    pricePerDay: Number.isNaN(rawPrice) ? 0 : rawPrice,
-    daily_rate: Number.isNaN(rawPrice) ? 0 : rawPrice,
-    available: (vehicleData.status || 'available') === 'available',
-    status: vehicleData.status || 'available',
+    // Identity
+    name:         vehicleData.name  || vehicleData.model || 'Unknown Vehicle',
+    brand:        vehicleData.brand || 'Unknown Brand',
+    model:        vehicleData.model || vehicleData.name  || 'Unknown Model',
+    year:         Number(vehicleData.year || new Date().getFullYear()),
+    // Price (all aliases the backend may accept)
+    price:        Number.isNaN(rawPrice) ? 0 : rawPrice,
+    pricePerDay:  Number.isNaN(rawPrice) ? 0 : rawPrice,
+    daily_rate:   Number.isNaN(rawPrice) ? 0 : rawPrice,
+    // Availability
+    available:    (vehicleData.status || 'available') === 'available',
+    status:       vehicleData.status || 'available',
+    // New fields — always include so they aren't silently dropped
+    type:         vehicleData.type         || '',
+    vehicle_type: vehicleData.type         || '',   // backend field name alias
+    transmission: vehicleData.transmission || '',
+    fuel:         vehicleData.fuel         || '',
+    seats:        vehicleData.seats !== undefined && vehicleData.seats !== null && vehicleData.seats !== ''
+                    ? Number(vehicleData.seats)
+                    : null,
+    location:     vehicleData.location    || '',
+    description:  vehicleData.description || '',
   };
 
-  if (vehicleData.location) payload.location = vehicleData.location;
-  if (vehicleData.description) payload.description = vehicleData.description;
-  if (vehicleData.seats !== undefined && vehicleData.seats !== null && vehicleData.seats !== '') {
-    payload.seats = Number(vehicleData.seats) || vehicleData.seats;
-  }
-  if (vehicleData.fuel) payload.fuel = vehicleData.fuel;
   if (vehicleData.photoUri) payload.photoUri = vehicleData.photoUri;
 
   return payload;
+};
+
+// ── toApiVehiclePatch: build PATCH payload — same fields, no silent skips ─────
+const toApiVehiclePatch = (updates) => {
+  const body = {};
+
+  // Always include every field that exists on the form so edits are never lost.
+  // Use `!== undefined` instead of truthiness so empty strings clear values.
+
+  if (updates.brand !== undefined)
+    body.brand = updates.brand;
+
+  if (updates.name !== undefined || updates.model !== undefined) {
+    body.name  = updates.name  || updates.model || '';
+    body.model = updates.model || updates.name  || '';
+  }
+
+  if (updates.year !== undefined)
+    body.year = Number(updates.year);
+
+  if (updates.pricePerDay !== undefined || updates.price !== undefined) {
+    const rawPrice = Number(updates.pricePerDay ?? updates.price ?? 0);
+    const safePrice = Number.isNaN(rawPrice) ? 0 : rawPrice;
+    body.daily_rate  = safePrice;
+    body.price       = safePrice;
+    body.pricePerDay = safePrice;
+  }
+
+  if (updates.status !== undefined) {
+    body.available = updates.status === 'available';
+    body.status    = updates.status;
+  }
+
+  // ── Fields that were missing from the original updateVehicle ──────────────
+  if (updates.type !== undefined) {
+    body.type         = updates.type;
+    body.vehicle_type = updates.type;   // backend field name alias
+  }
+
+  if (updates.transmission !== undefined)
+    body.transmission = updates.transmission;
+
+  if (updates.fuel !== undefined)
+    body.fuel = updates.fuel;
+
+  if (updates.seats !== undefined && updates.seats !== null && updates.seats !== '')
+    body.seats = Number(updates.seats);
+
+  if (updates.location !== undefined)
+    body.location = updates.location;
+
+  if (updates.description !== undefined)
+    body.description = updates.description;
+
+  if (updates.photoUri !== undefined)
+    body.photoUri = updates.photoUri;
+
+  return body;
 };
 
 export function VehicleProvider({ children }) {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Helper to update both React State and Local Storage at the same time
   const mutateVehicles = useCallback((updater) => {
     setVehicles((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -112,30 +184,25 @@ export function VehicleProvider({ children }) {
 
   const loadVehicles = useCallback(async () => {
     try {
-      // 1. Load locally saved cars immediately so they don't disappear
       const localData = await AsyncStorage.getItem('carRental.vehicles.local');
       const localVehicles = localData ? JSON.parse(localData) : [];
       if (localVehicles.length > 0) {
         setVehicles(localVehicles);
       }
 
-      // 2. Fetch from backend
       const data = await apiRequest('/api/cars/');
       console.warn('[VehicleContext] loadVehicles fetched', Array.isArray(data) ? data.length : 0, 'items');
       if (Array.isArray(data)) {
         const apiVehicles = data.map(fromApiVehicle);
-        
-        // 3. Merge API and local data to ensure backend doesn't overwrite your added cars
         const merged = [...apiVehicles];
         const apiIds = new Set(apiVehicles.map(v => v.id));
 
         localVehicles.forEach(localV => {
           if (!apiIds.has(localV.id)) {
-            merged.push(localV); // Keep cars that backend failed to return
+            merged.push(localV);
           } else {
             const apiIdx = merged.findIndex(v => v.id === localV.id);
             if (apiIdx >= 0 && !merged[apiIdx].ownerId && localV.ownerId) {
-              // Restore owner info if backend forgot it
               merged[apiIdx] = { ...merged[apiIdx], ownerId: localV.ownerId, ownerName: localV.ownerName };
             }
           }
@@ -150,21 +217,16 @@ export function VehicleProvider({ children }) {
 
   useEffect(() => {
     let mounted = true;
-
     (async () => {
       await loadVehicles();
       if (mounted) setLoading(false);
     })();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [loadVehicles]);
 
   const addVehicle = async (vehicleData, owner) => {
     const payloadObj = toApiVehicle(vehicleData);
 
-    // Resolve owner identifier from passed owner or from saved session as fallback
     let ownerIdentifier = owner?.id || owner?.pk || owner?.userId || owner?.email || null;
     let ownerName = owner?.firstName || owner?.fullName || owner?.username || owner?.email || null;
     if (!ownerIdentifier) {
@@ -174,22 +236,18 @@ export function VehicleProvider({ children }) {
           const sessUser = JSON.parse(sess);
           ownerIdentifier = ownerIdentifier || sessUser?.id || sessUser?.pk || sessUser?.userId || sessUser?.email || null;
           ownerName = ownerName || sessUser?.firstName || sessUser?.fullName || sessUser?.username || sessUser?.email || null;
-          // also set owner object so local fallback works
           owner = owner || sessUser;
         }
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) { /* ignore */ }
     }
 
-    // Include owner identifiers in payload so backend can set owner when unauthenticated
     if (ownerIdentifier) {
-      payloadObj.owner = ownerIdentifier;
-      payloadObj.ownerId = ownerIdentifier;
-      payloadObj.owner_id = ownerIdentifier;
-      payloadObj.user = ownerIdentifier;
-      payloadObj.user_id = ownerIdentifier;
-      payloadObj.ownerEmail = ownerIdentifier;
+      payloadObj.owner       = ownerIdentifier;
+      payloadObj.ownerId     = ownerIdentifier;
+      payloadObj.owner_id    = ownerIdentifier;
+      payloadObj.user        = ownerIdentifier;
+      payloadObj.user_id     = ownerIdentifier;
+      payloadObj.ownerEmail  = ownerIdentifier;
       payloadObj.owner_email = ownerIdentifier;
     }
 
@@ -199,7 +257,6 @@ export function VehicleProvider({ children }) {
       Object.entries(payloadObj).forEach(([k, v]) => {
         if (k !== 'photoUri' && v !== undefined && v !== null) payload.append(k, String(v));
       });
-      
       const uri = vehicleData.photoUri;
       const filename = uri.split('/').pop() || 'photo.jpg';
       const type = `image/${filename.split('.').pop() || 'jpeg'}`;
@@ -207,17 +264,14 @@ export function VehicleProvider({ children }) {
       payload.append('image', { uri, name: filename, type });
     }
 
-    const created = await apiRequest('/api/cars/', {
-      method: 'POST',
-      body: payload,
-    });
+    const created = await apiRequest('/api/cars/', { method: 'POST', body: payload });
     let normalized = fromApiVehicle(created);
-    console.warn('[VehicleContext] addVehicle created', normalized?.id, 'ownerId=', normalized?.ownerId, 'ownerName=', normalized?.ownerName);
-    // Ensure owner info is present so owner views update immediately
+    console.warn('[VehicleContext] addVehicle created', normalized?.id, 'ownerId=', normalized?.ownerId);
+
     if ((ownerIdentifier || ownerName) && (!normalized.ownerId || normalized.ownerId === null)) {
       normalized = {
         ...normalized,
-        ownerId: normalized.ownerId || ownerIdentifier,
+        ownerId:   normalized.ownerId   || ownerIdentifier,
         ownerName: normalized.ownerName || ownerName || 'Unknown Owner',
       };
     }
@@ -227,28 +281,7 @@ export function VehicleProvider({ children }) {
 
   const updateVehicle = async (id, updates) => {
     try {
-      const body = {};
-      if (updates.brand) body.brand = updates.brand;
-      if (updates.name || updates.model) body.name = updates.name || updates.model;
-      if (updates.model || updates.name) body.model = updates.model || updates.name;
-      if (updates.year) body.year = Number(updates.year);
-      if (updates.pricePerDay || updates.price) {
-        const rawPrice = Number(updates.pricePerDay ?? updates.price);
-        body.daily_rate = Number.isNaN(rawPrice) ? 0 : rawPrice;
-        body.price = Number.isNaN(rawPrice) ? 0 : rawPrice;
-        body.pricePerDay = Number.isNaN(rawPrice) ? 0 : rawPrice;
-      }
-      if (updates.status) {
-        body.available = updates.status === 'available';
-        body.status = updates.status;
-      }
-      if (updates.location) body.location = updates.location;
-      if (updates.description) body.description = updates.description;
-      if (updates.seats !== undefined && updates.seats !== null && updates.seats !== '') {
-        body.seats = Number(updates.seats) || updates.seats;
-      }
-      if (updates.fuel) body.fuel = updates.fuel;
-      if (updates.photoUri) body.photoUri = updates.photoUri;
+      const body = toApiVehiclePatch(updates);
 
       let payload = body;
       if (updates.photoUri && !updates.photoUri.startsWith('http')) {
@@ -263,10 +296,7 @@ export function VehicleProvider({ children }) {
         payload.append('image', { uri, name: filename, type });
       }
 
-      const updated = await apiRequest(`/api/cars/${id}/`, {
-        method: 'PATCH',
-        body: payload,
-      });
+      const updated = await apiRequest(`/api/cars/${id}/`, { method: 'PATCH', body: payload });
       const normalized = fromApiVehicle(updated);
       mutateVehicles((prev) => prev.map((v) => (v.id === id ? normalized : v)));
       return normalized;
@@ -278,9 +308,7 @@ export function VehicleProvider({ children }) {
 
   const deleteVehicle = async (id) => {
     try {
-      await apiRequest(`/api/cars/${id}/`, {
-        method: 'DELETE',
-      });
+      await apiRequest(`/api/cars/${id}/`, { method: 'DELETE' });
       mutateVehicles((prev) => prev.filter((v) => v.id !== id));
     } catch (error) {
       console.warn('[VehicleContext] Failed to delete vehicle', error);
@@ -288,18 +316,17 @@ export function VehicleProvider({ children }) {
   };
 
   const approveVehicle = useCallback(() => {}, []);
-  const rejectVehicle = useCallback(() => {}, []);
+  const rejectVehicle  = useCallback(() => {}, []);
 
   const getOwnerVehicles = useCallback((ownerId, ownerEmail) =>
     vehicles.filter((v) => {
-      const matchId = ownerId && String(v.ownerId) === String(ownerId);
+      const matchId    = ownerId    && String(v.ownerId) === String(ownerId);
       const matchEmail = ownerEmail && String(v.ownerId).toLowerCase() === String(ownerEmail).toLowerCase();
       return matchId || matchEmail;
     }),
   [vehicles]);
 
-  const getPendingVehicles = useCallback(() => [], []);
-
+  const getPendingVehicles  = useCallback(() => [], []);
   const getApprovedVehicles = useCallback(() =>
     vehicles.filter((v) => (v.approvalStatus || 'approved') !== 'rejected'),
   [vehicles]);

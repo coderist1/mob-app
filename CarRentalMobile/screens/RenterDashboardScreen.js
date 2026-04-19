@@ -75,6 +75,7 @@ function VehicleCard({ vehicle, onRent, isSaved, onToggleSave }) {
   const yearLabel = vehicle.year || '----';
   const modelLabel = vehicle.model || 'Vehicle';
   const seatsLabel = vehicle.seats ? `${vehicle.seats} seats` : 'Seats n/a';
+  const transmissionLabel = vehicle.transmission || 'Transmission';
   const fuelLabel = vehicle.fuel || 'Fuel n/a';
   const ownerLabel = vehicle.ownerName || 'Owner n/a';
 
@@ -101,11 +102,15 @@ function VehicleCard({ vehicle, onRent, isSaved, onToggleSave }) {
           <View style={s.yearPill}><Text style={s.yearPillText}>{yearLabel}</Text></View>
         </View>
 
+        <Text style={[s.vehicleOwner, { fontSize: 12, color: C.g500, fontWeight: '600', marginTop: 4, letterSpacing: 0.2, }]}>
+          Owner: {ownerLabel}
+        </Text>
+
         <View style={s.vehicleChipRow}>
           <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{modelLabel}</Text></View>
           <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{seatsLabel}</Text></View>
           <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{fuelLabel}</Text></View>
-          <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{ownerLabel}</Text></View>
+          <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{transmissionLabel}</Text></View>
         </View>
 
         {vehicle.location ? <Text style={s.vehicleLocation}>{vehicle.location}</Text> : null}
