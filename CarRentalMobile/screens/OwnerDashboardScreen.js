@@ -3,7 +3,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Modal, StyleSheet, Alert, Platform, StatusBar, Image, RefreshControl,
-  FlatList,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,16 +24,6 @@ const C = {
   g300: '#d1d5db', g400: '#9ca3af', g500: '#6b7280',
   g700: '#374151', g900: '#111827', white: '#ffffff',
 };
-
-// ── Constants mirroring web Dashboard.jsx ─────────────────────────────────────
-const LOCATIONS = [
-  'Manila', 'Quezon City', 'Cebu City', 'Davao City',
-  'Makati', 'Taguig', 'Pasig', 'Parañaque', 'Caloocan', 'Antipolo',
-];
-const VEHICLE_TYPES  = ['Sedan', 'SUV', 'Hatchback', 'Pickup', 'Van', 'MPV', 'Crossover', 'Coupe', 'Sports'];
-const TRANSMISSIONS  = ['Automatic', 'Manual', 'CVT'];
-const FUEL_TYPES     = ['Gasoline', 'Diesel', 'Hybrid', 'Electric'];
-const CURRENT_YEAR   = new Date().getFullYear();
 
 const IcSearch = ({ s = 15, c = C.g400 }) => (
   <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -58,39 +47,6 @@ const IcBook = ({ s = 14, c = C.white }) => (
     <Path d="M14 2v6h6M9 13h6M9 17h4" />
   </Svg>
 );
-
-/* ── Picker Sheet (bottom-sheet select, replaces free-text for option fields) ── */
-function PickerSheet({ visible, title, options, selected, onSelect, onClose }) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={s.pickerSheet}>
-          <View style={s.pickerHeader}>
-            <Text style={s.pickerTitle}>{title}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={s.pickerDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={options}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[s.pickerOption, selected === item && s.pickerOptionSelected]}
-                onPress={() => { onSelect(item); onClose(); }}
-              >
-                <Text style={[s.pickerOptionText, selected === item && s.pickerOptionTextSelected]}>
-                  {item}
-                </Text>
-                {selected === item && <Text style={s.pickerCheck}>✓</Text>}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-}
 
 /* ── Vehicle Card ── */
 function VehicleCard({ vehicle, onEdit, onDelete }) {
@@ -160,63 +116,16 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════════════════════════════
-   VehicleFormModal
-   Fields now match web Dashboard.jsx exactly:
-     Brand *, Model/Name *, Year *, Type *, Transmission *, Fuel Type *,
-     Seats *, Price Per Day *, Location *, Description, Vehicle Photo
-══════════════════════════════════════════════════════════════════════════════ */
+/* ── Vehicle Form Modal ── */
 function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
-  const BLANK = {
-    brand: '', name: '', year: String(CURRENT_YEAR),
-    type: '', transmission: '', fuel: '',
-    seats: '5', pricePerDay: '', location: '',
-    description: '', status: 'available',
-  };
-
-  const [form,     setForm]     = useState(BLANK);
-  const [photoUri, setPhotoUri] = useState(null);
-  const [errors,   setErrors]   = useState({});
-
-  // Picker state: { field, title, options }
-  const [picker, setPicker] = useState(null);
-
-  // Re-populate when modal opens
-  React.useEffect(() => {
-    if (!visible) return;
-    if (initial) {
-      setForm({
-        brand:        initial.brand        || '',
-        name:         initial.name         || initial.model || '',
-        year:         String(initial.year  || CURRENT_YEAR),
-        type:         initial.type         || '',
-        transmission: initial.transmission || '',
-        fuel:         initial.fuel         || '',
-        seats:        String(initial.seats || 5),
-        pricePerDay:  String(initial.pricePerDay || ''),
-        location:     initial.location     || '',
-        description:  initial.description  || '',
-        status:       initial.status       || (initial.available ? 'available' : 'rented'),
-      });
-      setPhotoUri(initial.photoUri || null);
-    } else {
-      setForm(BLANK);
-      setPhotoUri(null);
-    }
-    setErrors({});
-  }, [visible]);
-
-  const set = (k, v) => {
-    setForm(p => ({ ...p, [k]: v }));
-    if (errors[k]) setErrors(p => ({ ...p, [k]: undefined }));
-  };
-
-  const openPicker = (field, title, options) => setPicker({ field, title, options });
-  const closePicker = () => setPicker(null);
-
-  // ── Photo ───────────────────────────────────────────────────────────────
+  const blank = { name: '', model: '', year: '', pricePerDay: '', location: '', description: '', status: 'available', seats: '', fuel: '' };
+  const [form, setForm] = useState(initial || blank);
+  const [photoUri, setPhotoUri] = useState((initial && initial.photoUri) || null);
+  React.useEffect(() => { if (visible) setForm(initial || blank); }, [visible]);
+  React.useEffect(() => { if (visible) setPhotoUri((initial && initial.photoUri) || null); }, [visible]);
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const MEDIA_IMAGES = ImagePicker.MediaType?.Images || 'images';
-  const PICKER_OPTIONS = { mediaTypes: [MEDIA_IMAGES], allowsEditing: true, aspect: [16, 9], quality: 0.8 };
+  const PICKER_OPTIONS = { mediaTypes: [MEDIA_IMAGES], allowsEditing: true, aspect: [4,3], quality: 0.8 };
 
   async function ensurePermission(type) {
     if (type === 'camera') {
@@ -241,218 +150,60 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
     if (!r.canceled && r.assets?.[0]?.uri) setPhotoUri(r.assets[0].uri);
   };
 
-  const removePhoto = () => {
-    Alert.alert('Remove Photo', 'Are you sure you want to remove this vehicle photo?', [
-      { text: 'No, Keep', style: 'cancel' },
-      { text: 'Yes, Remove', style: 'destructive', onPress: () => setPhotoUri(null) },
-    ]);
-  };
-
-  // ── Validation (mirrors web required fields) ────────────────────────────
-  const validate = () => {
-    const e = {};
-    if (!form.brand.trim())       e.brand        = 'Brand is required';
-    if (!form.name.trim())        e.name         = 'Model/Name is required';
-    if (!form.year) {
-      e.year = 'Year is required';
-    } else {
-      const y = Number(form.year);
-      if (isNaN(y) || y < 1900 || y > CURRENT_YEAR) e.year = `Year must be 1900–${CURRENT_YEAR}`;
-    }
-    if (!form.type)               e.type         = 'Vehicle type is required';
-    if (!form.transmission)       e.transmission = 'Transmission is required';
-    if (!form.fuel)               e.fuel         = 'Fuel type is required';
-    if (!form.seats) {
-      e.seats = 'Seats is required';
-    } else {
-      const s = Number(form.seats);
-      if (isNaN(s) || s < 1 || s > 12) e.seats = 'Seats must be 1–12';
-    }
-    if (!form.pricePerDay)        e.pricePerDay  = 'Price per day is required';
-    else if (isNaN(Number(form.pricePerDay)) || Number(form.pricePerDay) < 0)
-      e.pricePerDay = 'Enter a valid price';
-    if (!form.location)           e.location     = 'Location is required';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
   const handleSave = () => {
-    if (!validate()) {
-      Alert.alert('Incomplete Form', 'Please fill in all required fields.');
-      return;
-    }
-    onSave({ ...form, photoUri });
+    if (!form.name.trim())  { Alert.alert('Required', 'Vehicle name is required.'); return; }
+    if (!form.pricePerDay)  { Alert.alert('Required', 'Price per day is required.'); return; }
+    const payload = { ...form, photoUri };
+    onSave(payload);
   };
-
-  // ── Render helpers ──────────────────────────────────────────────────────
-  const SelectRow = ({ field, label, options, title, required }) => (
-    <View style={{ marginBottom: 14 }}>
-      <Text style={s.fieldLabel}>{label}{required && <Text style={{ color: C.danger }}> *</Text>}</Text>
-      <TouchableOpacity
-        style={[s.input, s.selectRow, errors[field] && s.inputError]}
-        onPress={() => openPicker(field, title || label, options)}
-      >
-        <Text style={form[field] ? s.selectVal : s.selectPlaceholder}>
-          {form[field] || `Select ${label}`}
-        </Text>
-        <Text style={s.selectChevron}>›</Text>
-      </TouchableOpacity>
-      {errors[field] ? <Text style={s.errorTxt}>{errors[field]}</Text> : null}
-    </View>
-  );
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={{ flex: 1, backgroundColor: C.white }}>
-        {/* Header */}
         <View style={s.modalHeader}>
           <Text style={s.modalTitle}>{isEdit ? 'Edit Vehicle' : 'Add New Vehicle'}</Text>
           <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
         </View>
-
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 50 }} keyboardShouldPersistTaps="handled">
-
-          {/* ── Vehicle Photo ──────────────────────────────────────────────── */}
-          <View style={{ marginBottom: 18 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+          {/* Image upload */}
+          <View style={{ marginBottom: 14 }} key="photo">
             <Text style={s.fieldLabel}>Vehicle Photo</Text>
-            {photoUri ? (
-              <View style={s.photoPreview}>
-                <Image source={{ uri: photoUri }} style={s.photoPreviewImg} resizeMode="cover" />
-                <View style={s.photoPreviewActions}>
-                  <TouchableOpacity style={s.photoChangeBtn} onPress={pickFromLibrary}>
-                    <Text style={s.photoChangeBtnText}>Change</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.photoRemoveBtn} onPress={removePhoto}>
-                    <Text style={s.photoRemoveBtnText}>Remove</Text>
-                  </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {photoUri ? (
+                <View style={{ width: 100, height: 74, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f3f6fb' }}>
+                  <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 </View>
+              ) : (
+                <View style={{ width: 100, height: 74, borderRadius: 8, backgroundColor: '#f3f6fb', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: C.g400 }}>No photo</Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity onPress={pickFromLibrary} style={[s.btnSecondary, { marginBottom: 8 }]}>
+                  <Text style={s.btnSecondaryText}>Choose from Library</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={pickCamera} style={s.btnSecondary}>
+                  <Text style={s.btnSecondaryText}>Take Photo</Text>
+                </TouchableOpacity>
               </View>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={s.photoPlaceholder}>
-                  <Text style={{ color: C.g400, fontSize: 11 }}>No photo</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <TouchableOpacity onPress={pickFromLibrary} style={[s.btnSecondary, { marginBottom: 8 }]}>
-                    <Text style={s.btnSecondaryText}>Choose from Library</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={pickCamera} style={s.btnSecondary}>
-                    <Text style={s.btnSecondaryText}>Take Photo</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* ── Row: Brand + Model/Name ────────────────────────────────────── */}
-          <View style={s.formRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Brand<Text style={{ color: C.danger }}> *</Text></Text>
-              <TextInput
-                style={[s.input, errors.brand && s.inputError]}
-                placeholder="e.g. Toyota"
-                placeholderTextColor={C.g400}
-                value={form.brand}
-                onChangeText={v => set('brand', v)}
-              />
-              {errors.brand ? <Text style={s.errorTxt}>{errors.brand}</Text> : null}
-            </View>
-            <View style={{ width: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Model/Name<Text style={{ color: C.danger }}> *</Text></Text>
-              <TextInput
-                style={[s.input, errors.name && s.inputError]}
-                placeholder="e.g. Vios"
-                placeholderTextColor={C.g400}
-                value={form.name}
-                onChangeText={v => set('name', v)}
-              />
-              {errors.name ? <Text style={s.errorTxt}>{errors.name}</Text> : null}
             </View>
           </View>
-
-          {/* ── Row: Year + Type ───────────────────────────────────────────── */}
-          <View style={s.formRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Year<Text style={{ color: C.danger }}> *</Text></Text>
-              <TextInput
-                style={[s.input, errors.year && s.inputError]}
-                placeholder={String(CURRENT_YEAR)}
-                placeholderTextColor={C.g400}
-                value={form.year}
-                onChangeText={v => set('year', v.replace(/[^0-9]/g, '').slice(0, 4))}
-                keyboardType="numeric"
-                maxLength={4}
-              />
-              {errors.year ? <Text style={s.errorTxt}>{errors.year}</Text> : null}
+          {[
+            { key: 'name',        label: 'Vehicle Name *',      placeholder: 'e.g. Toyota Vios' },
+            { key: 'model',       label: 'Model',               placeholder: 'e.g. 1.3 E CVT' },
+            { key: 'year',        label: 'Year',                placeholder: 'e.g. 2022', numeric: true },
+            { key: 'pricePerDay', label: 'Price per Day (₱) *', placeholder: 'e.g. 2500', numeric: true },
+            { key: 'location',    label: 'Pickup Location',     placeholder: 'e.g. Davao City' },
+            { key: 'seats',       label: 'Seats',               placeholder: 'e.g. 5', numeric: true },
+            { key: 'fuel',        label: 'Fuel Type',           placeholder: 'e.g. Gasoline' },
+          ].map(f => (
+            <View key={f.key} style={{ marginBottom: 14 }}>
+              <Text style={s.fieldLabel}>{f.label}</Text>
+              <TextInput style={s.input} placeholder={f.placeholder} placeholderTextColor={C.g400}
+                value={String(form[f.key] || '')} onChangeText={v => set(f.key, v)}
+                keyboardType={f.numeric ? 'numeric' : 'default'} />
             </View>
-            <View style={{ width: 12 }} />
-            <View style={{ flex: 1 }}>
-              <SelectRow field="type" label="Type" options={VEHICLE_TYPES} required />
-            </View>
-          </View>
-
-          {/* ── Row: Transmission + Fuel Type ─────────────────────────────── */}
-          <View style={s.formRow}>
-            <View style={{ flex: 1 }}>
-              <SelectRow field="transmission" label="Transmission" options={TRANSMISSIONS} required />
-            </View>
-            <View style={{ width: 12 }} />
-            <View style={{ flex: 1 }}>
-              <SelectRow field="fuel" label="Fuel Type" options={FUEL_TYPES} required />
-            </View>
-          </View>
-
-          {/* ── Row: Seats + Price Per Day ─────────────────────────────────── */}
-          <View style={s.formRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Seats<Text style={{ color: C.danger }}> *</Text></Text>
-              <TextInput
-                style={[s.input, errors.seats && s.inputError]}
-                placeholder="5"
-                placeholderTextColor={C.g400}
-                value={form.seats}
-                onChangeText={v => set('seats', v.replace(/[^0-9]/g, '').slice(0, 2))}
-                keyboardType="numeric"
-                maxLength={2}
-              />
-              {errors.seats ? <Text style={s.errorTxt}>{errors.seats}</Text> : null}
-            </View>
-            <View style={{ width: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>Price/Day (₱)<Text style={{ color: C.danger }}> *</Text></Text>
-              <TextInput
-                style={[s.input, errors.pricePerDay && s.inputError]}
-                placeholder="0"
-                placeholderTextColor={C.g400}
-                value={form.pricePerDay}
-                onChangeText={v => set('pricePerDay', v.replace(/[^0-9]/g, ''))}
-                keyboardType="numeric"
-              />
-              {errors.pricePerDay ? <Text style={s.errorTxt}>{errors.pricePerDay}</Text> : null}
-            </View>
-          </View>
-
-          {/* ── Location (dropdown) ────────────────────────────────────────── */}
-          <SelectRow field="location" label="Location" options={LOCATIONS} required />
-
-          {/* ── Description ───────────────────────────────────────────────── */}
+          ))}
           <View style={{ marginBottom: 14 }}>
-            <Text style={s.fieldLabel}>Description</Text>
-            <TextInput
-              style={[s.input, s.textArea]}
-              placeholder="Describe the vehicle (optional)"
-              placeholderTextColor={C.g400}
-              value={form.description}
-              onChangeText={v => set('description', v)}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* ── Status (available / unavailable) — kept from original ─────── */}
-          <View style={{ marginBottom: 20 }}>
             <Text style={s.fieldLabel}>Status</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {['available', 'unavailable'].map(st => (
@@ -465,25 +216,11 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
               ))}
             </View>
           </View>
-
-          {/* ── Submit ────────────────────────────────────────────────────── */}
           <TouchableOpacity onPress={handleSave} style={s.btnPrimary}>
             <Text style={s.btnPrimaryText}>{isEdit ? 'Save Changes' : 'Add Vehicle'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
-
-      {/* Picker bottom-sheet rendered inside the modal */}
-      {picker && (
-        <PickerSheet
-          visible={!!picker}
-          title={picker.title}
-          options={picker.options}
-          selected={form[picker.field]}
-          onSelect={v => { set(picker.field, v); closePicker(); }}
-          onClose={closePicker}
-        />
-      )}
     </Modal>
   );
 }
@@ -748,32 +485,31 @@ export default function OwnerDashboardScreen() {
   const [searchQuery,      setSearchQuery]       = useState('');
   const [ownerFilters,     setOwnerFilters]      = useState({ statuses: [], fuels: [], minPrice: '', maxPrice: '' });
   const [showAddModal,     setShowAddModal]      = useState(false);
+    const toggleOwnerFilter = (key, value) => {
+      setOwnerFilters(prev => ({
+        ...prev,
+        [key]: prev[key].includes(value)
+          ? prev[key].filter(v => v !== value)
+          : [...prev[key], value],
+      }));
+    };
 
-  const toggleOwnerFilter = (key, value) => {
-    setOwnerFilters(prev => ({
-      ...prev,
-      [key]: prev[key].includes(value)
-        ? prev[key].filter(v => v !== value)
-        : [...prev[key], value],
-    }));
-  };
+    const setOwnerPriceFilter = (key, value) => {
+      setOwnerFilters(prev => ({ ...prev, [key]: value }));
+    };
 
-  const setOwnerPriceFilter = (key, value) => {
-    setOwnerFilters(prev => ({ ...prev, [key]: value }));
-  };
+    const clearOwnerFilters = () => {
+      setOwnerFilters({ statuses: [], fuels: [], minPrice: '', maxPrice: '' });
+    };
 
-  const clearOwnerFilters = () => {
-    setOwnerFilters({ statuses: [], fuels: [], minPrice: '', maxPrice: '' });
-  };
+  const [showEditModal,    setShowEditModal]     = useState(false);
+  const [editTarget,       setEditTarget]        = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editTarget,    setEditTarget]    = useState(null);
-  const [refreshing,    setRefreshing]    = useState(false);
-
-  const vehicles      = getOwnerVehicles(ownerId, user?.email);
+  const vehicles = getOwnerVehicles(ownerId, user?.email);
   const rentalHistory = getBookingsForOwner(ownerId);
-  const userName      = user?.firstName || user?.fullName || 'Owner';
-  const pendingCount  = rentalHistory.filter(r => r.status === 'pending').length;
+  const userName     = user?.firstName || user?.fullName || 'Owner';
+  const pendingCount = rentalHistory.filter(r => r.status === 'pending').length;
 
   const stats = useMemo(() => ({
     total:     vehicles.length,
@@ -784,6 +520,7 @@ export default function OwnerDashboardScreen() {
 
   const filtered = useMemo(() => {
     let result = vehicles;
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(v =>
@@ -792,14 +529,23 @@ export default function OwnerDashboardScreen() {
         v.location?.toLowerCase().includes(q)
       );
     }
-    if (ownerFilters.statuses.length > 0)
+
+    if (ownerFilters.statuses.length > 0) {
       result = result.filter(v => ownerFilters.statuses.includes(v.status));
-    if (ownerFilters.fuels.length > 0)
+    }
+
+    if (ownerFilters.fuels.length > 0) {
       result = result.filter(v => ownerFilters.fuels.includes(v.fuel));
-    if (ownerFilters.minPrice)
+    }
+
+    if (ownerFilters.minPrice) {
       result = result.filter(v => (parseFloat(v.pricePerDay) || 0) >= Number(ownerFilters.minPrice));
-    if (ownerFilters.maxPrice)
+    }
+
+    if (ownerFilters.maxPrice) {
       result = result.filter(v => (parseFloat(v.pricePerDay) || 0) <= Number(ownerFilters.maxPrice));
+    }
+
     return result;
   }, [vehicles, searchQuery, ownerFilters]);
 
@@ -810,8 +556,9 @@ export default function OwnerDashboardScreen() {
       Alert.alert('Session expired', 'Please sign in again to continue.');
       return;
     }
+
     try {
-      await addVehicle(form, user);
+      const created = await addVehicle(form, user);
       setShowAddModal(false);
       Alert.alert('Vehicle Added', 'Your vehicle listing is now live and visible to renters.');
     } catch (error) {
@@ -825,11 +572,13 @@ export default function OwnerDashboardScreen() {
       Alert.alert('No vehicle selected', 'Please choose a vehicle to edit first.');
       return;
     }
+
     const updated = await updateVehicle(editTarget.id, form);
     if (!updated) {
       Alert.alert('Unable to update vehicle', 'Please try again later.');
       return;
     }
+
     setShowEditModal(false);
     setEditTarget(null);
   };
@@ -922,21 +671,8 @@ export default function OwnerDashboardScreen() {
         <View style={s.contentShell}>{renderContent()}</View>
       </View>
       <BottomNav role="owner" activeTab={activeTab} onTabPress={handleTabPress} badges={{ rentals: pendingCount }} />
-
-      <VehicleFormModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSave={handleAdd}
-        initial={null}
-        isEdit={false}
-      />
-      <VehicleFormModal
-        visible={showEditModal}
-        onClose={() => { setShowEditModal(false); setEditTarget(null); }}
-        onSave={handleEdit}
-        initial={editTarget}
-        isEdit
-      />
+      <VehicleFormModal visible={showAddModal}  onClose={() => setShowAddModal(false)}  onSave={handleAdd}  initial={null}        isEdit={false} />
+      <VehicleFormModal visible={showEditModal} onClose={() => { setShowEditModal(false); setEditTarget(null); }} onSave={handleEdit} initial={editTarget} isEdit />
     </SafeAreaView>
   );
 }
@@ -1007,28 +743,11 @@ const s = StyleSheet.create({
   logBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: C.primary, borderRadius: 9, paddingVertical: 10, marginTop: 10, elevation: 2 },
   logBtnDone:   { backgroundColor: C.g100, borderWidth: 1, borderColor: C.g200, elevation: 0 },
   logBtnText:   { fontSize: 13, fontWeight: '700', color: C.white },
-  // Modal
   modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#dfe7f3', backgroundColor: '#f8fbff' },
   modalTitle:   { fontSize: 18, fontWeight: '700', color: C.navy },
   modalClose:   { fontSize: 22, color: C.g400 },
   fieldLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.g400, marginBottom: 6 },
-  formRow:      { flexDirection: 'row', marginBottom: 0 },
-  input:        { padding: 12, borderWidth: 1.5, borderColor: '#dbe3ee', borderRadius: 11, fontSize: 14, color: C.g900, backgroundColor: C.white, marginBottom: 0 },
-  inputError:   { borderColor: C.danger, backgroundColor: '#fff5f5' },
-  errorTxt:     { fontSize: 11, color: C.danger, marginTop: 3, marginBottom: 6 },
-  textArea:     { minHeight: 90, paddingTop: 12, textAlignVertical: 'top' },
-  selectRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  selectVal:    { fontSize: 14, color: C.g900, flex: 1 },
-  selectPlaceholder: { fontSize: 14, color: C.g400, flex: 1 },
-  selectChevron:{ fontSize: 20, color: C.g400 },
-  photoPreview: { borderRadius: 11, overflow: 'hidden', borderWidth: 1.5, borderColor: '#dbe3ee' },
-  photoPreviewImg: { width: '100%', height: 180 },
-  photoPreviewActions: { flexDirection: 'row' },
-  photoChangeBtn: { flex: 1, backgroundColor: '#eff6ff', paddingVertical: 10, alignItems: 'center', borderRightWidth: 1, borderRightColor: '#dbe3ee' },
-  photoChangeBtnText: { color: '#3b82f6', fontWeight: '700', fontSize: 13 },
-  photoRemoveBtn: { flex: 1, backgroundColor: '#fee2e2', paddingVertical: 10, alignItems: 'center' },
-  photoRemoveBtnText: { color: C.danger, fontWeight: '700', fontSize: 13 },
-  photoPlaceholder: { width: 100, height: 74, borderRadius: 8, backgroundColor: '#f3f6fb', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#dbe3ee' },
+  input:        { padding: 12, borderWidth: 1.5, borderColor: '#dbe3ee', borderRadius: 11, fontSize: 14, color: C.g900, backgroundColor: C.white },
   pillBtn:      { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1.5, borderColor: '#dbe3ee', backgroundColor: C.white },
   pillBtnText:  { fontSize: 13, fontWeight: '600', color: C.g500 },
   btnPrimary:   { backgroundColor: C.primary, borderRadius: 11, paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
@@ -1036,15 +755,4 @@ const s = StyleSheet.create({
   btnDanger:    { backgroundColor: C.danger, borderRadius: 11, paddingVertical: 13, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
   btnSecondary: { borderWidth: 1.5, borderColor: '#dbe3ee', borderRadius: 11, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', backgroundColor: C.white },
   btnSecondaryText: { color: C.g700, fontSize: 13, fontWeight: '700' },
-  // Picker sheet
-  pickerOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  pickerSheet:    { backgroundColor: C.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '60%', paddingBottom: 32 },
-  pickerHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  pickerTitle:    { fontSize: 16, fontWeight: '700', color: C.navy },
-  pickerDone:     { fontSize: 16, color: C.primary, fontWeight: '600' },
-  pickerOption:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  pickerOptionSelected:     { backgroundColor: '#f0fdf9' },
-  pickerOptionText:         { fontSize: 15, color: C.g700 },
-  pickerOptionTextSelected: { color: C.primaryDk, fontWeight: '700' },
-  pickerCheck:    { color: C.primary, fontSize: 17, fontWeight: '700' },
 });
