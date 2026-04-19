@@ -10,7 +10,9 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { useBookings } from '../context/BookingContext';
 
 // ─── Theme (matches RenterDashboardScreen exactly) ────────────────────
 const C = {
@@ -40,14 +42,6 @@ const BADGE = {
   rejected:  { bg: '#fee2e2', col: '#991b1b' },
 };
 
-// ─── Data ─────────────────────────────────────────────────────────────
-const RENTAL_DATA = [
-  { id: 'b1', renterEmail: 'renter@test.com', vehicleName: 'Toyota Vios',   vehicleModel: '1.3 E CVT',  ownerName: 'Carlos Owner', startDate: '2026-03-10', endDate: '2026-03-12', totalPrice: 5000,  status: 'pending'   },
-  { id: 'b2', renterEmail: 'renter@test.com', vehicleName: 'Honda City',    vehicleModel: '1.5 RS CVT', ownerName: 'Carlos Owner', startDate: '2026-02-15', endDate: '2026-02-20', totalPrice: 15000, status: 'completed' },
-  { id: 'b3', renterEmail: 'renter@test.com', vehicleName: 'Ford Everest',  vehicleModel: 'Titanium',   ownerName: 'Ana Vehicle',  startDate: '2026-03-01', endDate: '2026-03-05', totalPrice: 20000, status: 'approved'  },
-  { id: 'b4', renterEmail: 'other@test.com',  vehicleName: 'Toyota Hi-Ace', vehicleModel: 'GL Grandia', ownerName: 'Ben Rentals',  startDate: '2026-03-16', endDate: '2026-03-18', totalPrice: 9000,  status: 'rejected'  },
-];
-
 const IconBack     = ({ size = 20, color = C.g600 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <Path d="M15 19l-7-7 7-7" />
@@ -55,27 +49,43 @@ const IconBack     = ({ size = 20, color = C.g600 }) => (
 );
 
 // ─── Helpers ──────────────────────────────────────────────────────────
+function parseYMD(s) {
+  if (!s) return null;
+  if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  const maybe = new Date(s);
+  return isNaN(maybe.getTime()) ? null : maybe;
+}
+
 function fmtDate(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const d = parseYMD(iso) || new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
 function daysBetween(a, b) {
-  return Math.max(0, Math.round((new Date(b) - new Date(a)) / 86400000));
+  const da = parseYMD(a);
+  const db = parseYMD(b);
+  if (!da || !db) return 0;
+  return Math.max(0, Math.round((db - da) / 86400000));
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────
 export default function BookingsScreen({ hideHeader = false }) {
   const router   = useRouter();
   const { user } = useAuth();
+  const { getBookingsForOwner, getBookingsForRenter } = useBookings();
   const [activeTab, setActiveTab] = useState('all');
   const [query,     setQuery]     = useState('');
   const [expanded,  setExpanded]  = useState(null);
 
   const baseData = useMemo(() => {
-    if (user?.role === 'owner')  return RENTAL_DATA.filter(i => i.ownerName === 'Carlos Owner');
-    if (user?.role === 'renter') return RENTAL_DATA.filter(i => i.renterEmail === user?.email);
+    if (user?.role === 'owner')  return getBookingsForOwner(user?.id || user?.email);
+    if (user?.role === 'renter') return getBookingsForRenter(user?.email);
     return [];
-  }, [user]);
+  }, [getBookingsForOwner, getBookingsForRenter, user]);
 
   const stats = useMemo(() => ({
     total:     baseData.length,
@@ -106,22 +116,111 @@ export default function BookingsScreen({ hideHeader = false }) {
 
   const roleTitle = user?.role === 'owner' ? 'Rental Requests' : 'My Bookings';
 
-  return (
-    <View style={{ flex: 1, backgroundColor: '#edf1f7' }}>
-      {/* Only show header if hideHeader is false */}
-      {!hideHeader && (
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
-            <IconBack size={20} color={C.white} />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }}>
-            <Text style={s.headerTitle}>{roleTitle}</Text>
-            <Text style={s.headerSub}>
-              {user?.role === 'owner' ? 'Manage incoming requests' : 'Track your rentals'}
-            </Text>
+  if (hideHeader) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#edf1f7' }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+
+          {/* ── Stats — matches BookingsTab stat cards ── */}
+          <View style={s.statsRow}>
+            {[
+              { label: 'Total',   value: stats.total,     color: C.primary  },
+              { label: 'Pending', value: stats.pending,   color: C.warning  },
+              { label: 'Active',  value: stats.approved,  color: C.success  },
+              { label: 'Done',    value: stats.completed, color: '#3b82f6'  },
+            ].map(st => (
+              <View key={st.label} style={[s.statCard, { borderLeftColor: st.color }]}>
+                <Text style={[s.statValue, { color: st.color }]}>{st.value}</Text>
+                <Text style={s.statLabel}>{st.label}</Text>
+              </View>
+            ))}
           </View>
+
+          {/* ── Search — matches dashboard searchWrap ── */}
+          <View style={s.searchWrap}>
+            <TextInput
+              style={s.searchInput}
+              placeholder="Search vehicle or owner…"
+              placeholderTextColor={C.g400}
+              value={query}
+              onChangeText={setQuery}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery('')} activeOpacity={0.7}>
+                <Text style={s.clearBtn}>{'✕'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ── Filter tabs — matches dashboard filterTab ── */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={s.tabsScroll}
+            contentContainerStyle={s.tabsContent}
+          >
+            {TABS.map(tab => {
+              const active = activeTab === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[s.filterTab, active && s.filterTabActive, { marginHorizontal: 1.7 }]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.filterTabText, active && s.filterTabTextActive]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* ── Cards — matches rentalCard style ── */}
+          {filtered.length === 0 ? (
+            <View style={s.empty}>
+              <Text style={s.emptyIcon}>📭</Text>
+              <Text style={s.emptyTitle}>No bookings found</Text>
+              <Text style={s.emptySub}>
+                {activeTab === 'all'
+                  ? "You haven't made any bookings yet."
+                  : 'No ' + activeTab + ' bookings.'}
+              </Text>
+            </View>
+          ) : (
+            filtered.map(item => (
+              <BookingCard
+                key={item.id}
+                item={item}
+                isExpanded={expanded === item.id}
+                onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+              />
+            ))
+          )}
+
+        </ScrollView>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#edf1f7' }} edges={['top', 'bottom']}>
+      {/* Only show header if hideHeader is false */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} activeOpacity={0.7}>
+          <IconBack size={20} color={C.white} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle}>{roleTitle}</Text>
+          <Text style={s.headerSub}>
+            {user?.role === 'owner' ? 'Manage incoming requests' : 'Track your rentals'}
+          </Text>
         </View>
-      )}
+      </View>
 
       <ScrollView
         style={{ flex: 1 }}
@@ -207,7 +306,7 @@ export default function BookingsScreen({ hideHeader = false }) {
         )}
 
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -282,15 +381,7 @@ function BookingCard({ item, isExpanded, onToggle }) {
               <TouchableOpacity style={s.btnOutlineDanger} activeOpacity={0.8}>
                 <Text style={s.btnOutlineDangerText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]} activeOpacity={0.8}>
-                <Text style={s.btnPrimaryText}>Contact Owner</Text>
-              </TouchableOpacity>
             </View>
-          )}
-          {item.status === 'approved' && (
-            <TouchableOpacity style={s.btnPrimary} activeOpacity={0.8}>
-              <Text style={s.btnPrimaryText}>Message Owner</Text>
-            </TouchableOpacity>
           )}
           {item.status === 'completed' && (
             <View style={s.actionRow}>

@@ -1,97 +1,129 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiRequest } from '../services/api';
 
 const AuthContext = createContext(null);
 const USER_STORAGE_KEY = 'auth_user_data';
 const PHOTO_KEY_PREFIX = 'profile_photo_';
 
+const SESSION_KEY = 'carRental.session.v2';
+
 export function AuthProvider({ children }) {
-  const [state, setState] = useState({
-    user: null,
-    status: 'loading', 
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // 1. Bootstrap: Check for existing session on app launch
   useEffect(() => {
-    const bootstrapAsync = async () => {
+    let mounted = true;
+
+    (async () => {
       try {
-        const savedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
-        if (savedUser) {
-          const userData = JSON.parse(savedUser);
-          // Optional: Fetch latest profile photo from storage here
-          const photoUri = await AsyncStorage.getItem(`${PHOTO_KEY_PREFIX}${userData.id}`);
-          
-          setState({ 
-            user: { ...userData, photoUri: photoUri || userData.photoUri }, 
-            status: 'authenticated' 
-          });
-        } else {
-          setState({ user: null, status: 'idle' });
-        }
-      } catch (e) {
-        console.error("Auth Bootstrap Error:", e);
-        setState({ user: null, status: 'idle' });
+        const session = await AsyncStorage.getItem(SESSION_KEY);
+        if (!session) return;
+
+        const savedUser = JSON.parse(session);
+        if (!mounted) return;
+
+        setUser(savedUser);
+      } catch {
+        if (!mounted) return;
+        await AsyncStorage.removeItem(SESSION_KEY);
+        setUser(null);
+      } finally {
+        if (mounted) setLoading(false);
       }
+    })();
+
+    return () => {
+      mounted = false;
     };
-
-    bootstrapAsync();
   }, []);
 
-  // 2. Login: Handles persistence and state update
-  const login = useCallback(async (userData) => {
-    // Set loading to prevent UI interaction during async work
-    setState(prev => ({ ...prev, status: 'loading' }));
+  const persistAuth = useCallback(async (nextUser) => {
+    setUser(nextUser);
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextUser));
+  }, []);
 
+  const login = useCallback(async (email, password) => {
     try {
-      if (!userData?.id) throw new Error("Invalid user data");
-
-      const photoUri = await AsyncStorage.getItem(`${PHOTO_KEY_PREFIX}${userData.id}`);
-      const finalUser = { ...userData, photoUri: photoUri || userData.photoUri || null };
-
-      // Persist the session
-      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(finalUser));
-
-      setState({
-        user: finalUser,
-        status: 'authenticated'
+      const normalizedEmail = (email || '').trim().toLowerCase();
+      const loginData = await apiRequest('/api/login/', {
+        method: 'POST',
+        body: { username: normalizedEmail, password },
       });
+
+      // Accept the login data directly as the user profile since tokens are removed
+      const me = loginData?.user || loginData;
+      await persistAuth(me);
+      return { ok: true, user: me };
     } catch (error) {
-      console.error("Login Error:", error);
-      setState({ user: null, status: 'idle' });
+      return { ok: false, error: error.message || 'Invalid email or password.' };
+    }
+  }, [persistAuth]);
+
+  const register = useCallback(async (userData, password) => {
+    try {
+      const normalizedEmail = (userData?.email || '').trim().toLowerCase();
+      if (!normalizedEmail || !password) {
+        return { ok: false, error: 'Email and password are required.' };
+      }
+
+      await apiRequest('/api/register/', {
+        method: 'POST',
+        body: {
+          email: normalizedEmail,
+          username: normalizedEmail,
+          password,
+          firstName: userData?.firstName || '',
+          lastName: userData?.lastName || '',
+          middleName: userData?.middleName || '',
+          role: userData?.role || 'renter',
+          sex: userData?.sex || '',
+          dateOfBirth: userData?.dateOfBirth || null,
+        },
+      });
+
+      return await login(normalizedEmail, password);
+    } catch (error) {
+      return { ok: false, error: error.message || 'Registration failed.' };
+    }
+  }, [login]);
+
+  const logout = useCallback(async () => {
+    setUser(null);
+    await AsyncStorage.removeItem(SESSION_KEY);
+  }, []);
+
+  const updateUser = useCallback(async (partial) => {
+    try {
+      const updated = await apiRequest('/api/me/', {
+        method: 'PATCH',
+        body: {
+          firstName: partial?.firstName,
+          lastName: partial?.lastName,
+          middleName: partial?.middleName,
+          sex: partial?.sex,
+          dateOfBirth: partial?.dateOfBirth,
+        },
+      });
+
+      setUser(updated);
+      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+    } catch (error) {
+      console.warn('[AuthContext] Failed to update user', error);
     }
   }, []);
 
-  // 3. Logout: Clears storage and resets state
-  const logout = useCallback(async () => {
-    try {
-      await AsyncStorage.removeItem(USER_STORAGE_KEY);
-    } catch (e) {
-      console.error("Logout Error:", e);
-    } finally {
-      // Always reset state even if storage removal fails
-      setState({ user: null, status: 'idle' });
-    }
-  }, []);
+  const updatePhoto = useCallback((uri) => updateUser({ photoUri: uri ?? null }), [updateUser]);
 
   return (
-    <AuthContext.Provider
-      value={{ 
-        user: state.user, 
-        isLoading: state.status === 'loading', 
-        isAuthenticated: state.status === 'authenticated', 
-        login, 
-        logout 
-      }}
-    >
+    <AuthContext.Provider value={{ user, users: [], loading, login, register, logout, updateUser, updatePhoto }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
+  return ctx;
 }

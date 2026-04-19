@@ -1,5 +1,5 @@
 // screens/ProfileScreen.js
-// Unified profile screen — works for both owner and renter roles.
+// Unified profile screen — works for owner, renter, and admin roles.
 // Reads/writes via AuthContext so changes persist within the session.
 //
 // Profile picture CRUD
@@ -199,8 +199,9 @@ async function ensurePermission(type) {
   return status === 'granted';
 }
 
+const MEDIA_IMAGES = ImagePicker.MediaType?.Images || 'images';
 const PICKER_OPTIONS = {
-  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  mediaTypes: [MEDIA_IMAGES],
   allowsEditing: true,
   aspect: [1, 1],
   quality: 0.85,
@@ -406,16 +407,14 @@ function PhotoModal({ visible, currentUri, onClose, onSave, onRemove }) {
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, updateUser, updatePhoto, logout } = useAuth();
+  const u = user || {};
 
-  const u = user || {
-    id: 'demo', role: 'owner', firstName: 'Demo', lastName: 'User',
-    fullName: 'Demo User', email: 'demo@example.com',
-    sex: '', dob: null, phone: '', joinedAt: new Date().toISOString(),
-    photoUri: null,
-  };
+  React.useEffect(() => {
+    if (!user) router.replace('/login');
+  }, [router, user]);
 
   const roleMeta    = ROLE_META[u.role] || ROLE_META.renter;
-  const displayName = u.fullName || `${u.firstName} ${u.lastName}`;
+  const displayName = u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User';
 
   // ── Photo modal visibility ─────────────────────────────────────────────────
   const [photoModalOpen, setPhotoModalOpen] = useState(false);
@@ -434,6 +433,16 @@ export default function ProfileScreen() {
     phone:      u.phone      || '',
     email:      u.email      || '',
   });
+
+  React.useEffect(() => {
+    setDraft({
+      firstName:  user?.firstName  || '',
+      lastName:   user?.lastName   || '',
+      middleName: user?.middleName || '',
+      phone:      user?.phone      || '',
+      email:      user?.email      || '',
+    });
+  }, [user]);
 
   const setD = (k, v) => setDraft(d => ({ ...d, [k]: v }));
 
@@ -474,7 +483,7 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log Out', style: 'destructive', onPress: () => { logout(); router.replace('/login'); } },
+      { text: 'Log Out', style: 'destructive', onPress: async () => { await logout(); } },
     ]);
   };
 
@@ -487,6 +496,8 @@ export default function ProfileScreen() {
     : u.sex ? u.sex.charAt(0).toUpperCase() + u.sex.slice(1) : '';
 
   const inputStyle = (field) => [s.input, focused === field && s.inputFocused];
+
+  if (!user) return null;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.g50 }} edges={['top', 'bottom']}>
@@ -572,7 +583,7 @@ export default function ProfileScreen() {
         )}
 
         {/* ══ PERSONAL INFORMATION CARD ══════════════════════════════════ */}
-        <View style={[s.card, { marginTop: 14 }]}>
+        <View style={[s.card, { marginTop: 14 }]}> 
           <View style={s.cardHeader}>
             <View style={s.cardHeaderDot} />
             <Text style={s.cardHeaderTitle}>
@@ -677,7 +688,9 @@ export default function ProfileScreen() {
               <View style={[s.quickIcon, { backgroundColor: 'rgba(63,155,132,0.1)' }]}>
                 <IconCar size={16} color={C.primary} />
               </View>
-              <Text style={s.quickLabel}>{u.role === 'owner' ? 'My Dashboard' : 'Browse Vehicles'}</Text>
+              <Text style={s.quickLabel}>
+                {u.role === 'owner' ? 'My Dashboard' : u.role === 'admin' ? 'Admin Dashboard' : 'Browse Vehicles'}
+              </Text>
               <IconGo size={14} color={C.g400} />
             </TouchableOpacity>
 
@@ -734,7 +747,7 @@ export default function ProfileScreen() {
             <View style={s.cardHeader}>
               <View style={[s.cardHeaderDot, { backgroundColor: roleMeta.dot }]} />
               <Text style={s.cardHeaderTitle}>
-                {u.role === 'owner' ? 'Owner Details' : 'Renter Details'}
+                {u.role === 'owner' ? 'Owner Details' : u.role === 'admin' ? 'Admin Details' : 'Renter Details'}
               </Text>
             </View>
             <View style={{ padding: 16 }}>
@@ -747,6 +760,17 @@ export default function ProfileScreen() {
                   <View style={[s.roleInfoChip, { backgroundColor: 'rgba(63,155,132,0.08)', borderColor: 'rgba(63,155,132,0.2)' }]}>
                     <IconCar size={14} color={C.primary} />
                     <Text style={[s.roleInfoChipText, { color: C.primaryDk }]}>Active fleet management</Text>
+                  </View>
+                </>
+              ) : u.role === 'admin' ? (
+                <>
+                  <Text style={s.roleInfoText}>
+                    As an <Text style={s.roleInfoBold}>Administrator</Text>, you can monitor platform
+                    analytics and oversee system-level activity for the mobile app.
+                  </Text>
+                  <View style={[s.roleInfoChip, { backgroundColor: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.2)' }]}>
+                    <IconUser size={14} color="#7e22ce" />
+                    <Text style={[s.roleInfoChipText, { color: '#6b21a8' }]}>Analytics and operations</Text>
                   </View>
                 </>
               ) : (
@@ -774,26 +798,26 @@ export default function ProfileScreen() {
 // Screen styles
 // ─────────────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  banner: { backgroundColor: C.navy, paddingTop: Platform.OS === 'ios' ? 56 : 44, paddingBottom: 0, overflow: 'hidden' },
+  banner: { backgroundColor: C.navy, paddingTop: Platform.OS === 'ios' ? 44 : 28, paddingBottom: 6, overflow: 'hidden' },
   bannerBubble1: { position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: C.primary, opacity: 0.07, top: -80, right: -60 },
   bannerBubble2: { position: 'absolute', width: 140, height: 140, borderRadius: 70,  backgroundColor: C.primary, opacity: 0.05, bottom: 0,  left: -40 },
-  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 24 },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 12 },
   backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
-  topBarTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: C.white, textAlign: 'center' },
-  editBannerBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
-  editBannerText: { fontSize: 13, fontWeight: '700', color: C.white },
-  bannerContent: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 20, marginBottom: 24 },
+  topBarTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: C.white, textAlign: 'center' },
+  editBannerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  editBannerText: { fontSize: 12, fontWeight: '700', color: C.white },
+  bannerContent: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, marginBottom: 12 },
   bannerInfo:  { flex: 1 },
-  bannerName:  { fontSize: 20, fontWeight: '800', color: C.white, letterSpacing: -0.4, marginBottom: 3 },
-  bannerEmail: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 8 },
+  bannerName:  { fontSize: 18, fontWeight: '800', color: C.white, letterSpacing: -0.4, marginBottom: 2 },
+  bannerEmail: { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 6 },
   rolePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, alignSelf: 'flex-start' },
   roleDot:  { width: 6, height: 6, borderRadius: 3 },
   roleLabel:{ fontSize: 11, fontWeight: '700' },
   cameraBadge: {
     position: 'absolute', bottom: 0, right: 0,
-    width: 26, height: 26, borderRadius: 13,
+    width: 24, height: 24, borderRadius: 12,
     backgroundColor: C.primaryDk,
-    borderWidth: 2.5, borderColor: C.navy,
+    borderWidth: 2, borderColor: C.navy,
     alignItems: 'center', justifyContent: 'center',
   },
   toast: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#bbf7d0', marginHorizontal: 16, marginTop: 14, borderRadius: 12, padding: 12 },

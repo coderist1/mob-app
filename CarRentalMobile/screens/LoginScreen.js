@@ -1,5 +1,5 @@
 // screens/LoginScreen.js  – with AuthContext integration
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Platform, StatusBar, KeyboardAvoidingView,
@@ -58,45 +58,11 @@ const ArrowIcon = () => (
   </Svg>
 );
 
-// ── Demo users (simulate a user DB) ──────────────────────────────────────────
-const DEMO_USERS = {
-  'owner@test.com': {
-    id: 'u_owner', role: 'owner',
-    firstName: 'Alex', lastName: 'Reyes', middleName: 'B.',
-    fullName: 'Alex Reyes', email: 'owner@test.com',
-    sex: 'male', dob: '1990-05-15T00:00:00.000Z',
-    phone: '+63 912 345 6789',
-    joinedAt: '2024-01-10T00:00:00.000Z',
-    avatar: null,
-  },
-  'renter@test.com': {
-    id: 'u_renter', role: 'renter',
-    firstName: 'Maria', lastName: 'Santos', middleName: 'C.',
-    fullName: 'Maria Santos', email: 'renter@test.com',
-    sex: 'female', dob: '1995-08-22T00:00:00.000Z',
-    phone: '+63 917 654 3210',
-    joinedAt: '2024-03-01T00:00:00.000Z',
-    avatar: null,
-  },
-  'admin@test.com': {
-    id: 'u_admin', role: 'admin',
-    firstName: 'Admin', lastName: 'User', middleName: '',
-    fullName: 'Admin User', email: 'admin@test.com',
-    sex: '', dob: null, phone: '',
-    joinedAt: '2023-01-01T00:00:00.000Z',
-    avatar: null,
-  },
-};
-
-const DEMO = [
-  { label: 'Owner',  email: 'owner@test.com',  pass: 'password' },
-  { label: 'Renter', email: 'renter@test.com', pass: 'password' },
-  { label: 'Admin',  email: 'admin@test.com',  pass: 'admin123' },
-];
+// Demo accounts removed
 
 export default function LoginScreen() {
   const router    = useRouter();
-  const { login } = useAuth();   // ← NEW
+  const { login, user, loading: authLoading } = useAuth();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef(null);
   const pwInputRef = useRef(null);
@@ -110,6 +76,23 @@ export default function LoginScreen() {
 
   const fieldY = useRef({});
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (user.role === 'owner') {
+      router.replace('/dashboard');
+      return;
+    }
+    if (user.role === 'renter') {
+      router.replace('/renter');
+      return;
+    }
+    if (user.role === 'admin') {
+      router.replace('/admin');
+      return;
+    }
+    router.replace('/login');
+  }, [authLoading, user, router]);
+
   const scrollToField = (name) => {
     const y = fieldY.current[name];
     if (y != null && scrollRef.current) {
@@ -119,44 +102,45 @@ export default function LoginScreen() {
     }
   };
 
-  const handleLogin = () => {
-    setError('');
-    if (!email.trim() || !password.trim()) { setError('Please fill in all fields.'); return; }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const e = email.trim().toLowerCase();
-      const demoUser = DEMO_USERS[e];
+  // demo helper removed
 
-      if (demoUser) {
-        login(demoUser);   // ← Store user in context
-        // route according to the user's role rather than email
-        switch (demoUser.role) {
-          case 'owner':
-            router.replace('/dashboard');
-            break;
-          case 'renter':
-            router.replace('/renter');
-            break;
-          case 'admin':
-            router.replace('/admin');
-            break;
-          default:
-            // fallback just in case
-            router.replace('/login');
-        }
-      } else {
-        setError('Invalid email or password. Please try again.');
+  const handleLogin = async () => {
+    if (loading || authLoading) return;
+    setError('');
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password.trim()) { setError('Please fill in all fields.'); return; }
+    setLoading(true);
+    const result = await login(normalizedEmail, password);
+    setLoading(false);
+
+    if (!result.ok) {
+      setError(result.error || 'Invalid email or password. Please try again.');
+      return;
+    }
+
+    switch (result.user.role) {
+      case 'owner':
+        router.replace('/dashboard');
+        break;
+      case 'renter':
+        router.replace('/renter');
+        break;
+      case 'admin':
+        router.replace('/admin');
+        break;
+      default:
+        setError('This account has an unknown role.');
+        router.replace('/login');
+        break;
       }
-    }, 1000);
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.navy }} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.g50 }} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: C.navy }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={insets.top + 10}
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 10 : 0}
       >
         <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
@@ -166,7 +150,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         bounces={false}
-        keyboardDismissMode="interactive"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
         {/* ── HERO ── */}
         <View style={s.hero}>
@@ -174,21 +158,24 @@ export default function LoginScreen() {
           <View style={s.logoBox}><CarIcon size={28} color={C.primary} /></View>
           <Text style={s.heroTitle}>Welcome Back</Text>
           <Text style={s.heroSub}>Sign in to continue to CarRental</Text>
-          <Text style={s.demoHeading}>TAP TO AUTO-FILL DEMO CREDENTIALS</Text>
-          <View style={s.demoRow}>
-            {DEMO.map(d => (
-              <TouchableOpacity key={d.label} style={s.demoChip}
-                onPress={() => { setEmail(d.email); setPassword(d.pass); setError(''); }}>
-                <Text style={s.demoChipText}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={s.heroMetaRow}>
+            <View style={s.heroMetaChip}><Text style={s.heroMetaText}>Secure Login</Text></View>
+            <View style={s.heroMetaChip}><Text style={s.heroMetaText}>Owner • Renter • Admin</Text></View>
           </View>
         </View>
 
         {/* ── FORM CARD ── */}
         <View style={s.card}>
+          <View style={s.cardAccent} />
           <Text style={s.cardTitle}>Sign In</Text>
           <Text style={s.cardSub}>Enter your account details below</Text>
+
+          {authLoading && (
+            <View style={s.sessionBox}>
+              <ActivityIndicator color={C.primary} size="small" />
+              <Text style={s.sessionText}>Restoring your session...</Text>
+            </View>
+          )}
 
           {!!error && (
             <View style={s.errorBox}>
@@ -262,10 +249,10 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[s.btn, loading && { opacity: 0.75 }]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || authLoading}
             activeOpacity={0.87}
           >
-            {loading
+            {(loading || authLoading)
               ? <ActivityIndicator color={C.white} size="small" />
               : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={s.btnText}>Sign In</Text><ArrowIcon />
@@ -281,6 +268,8 @@ export default function LoginScreen() {
           <TouchableOpacity style={s.outlineBtn} onPress={() => router.push('/register')} activeOpacity={0.85}>
             <Text style={s.outlineBtnText}>Create an Account</Text>
           </TouchableOpacity>
+
+          {/* Demo credentials removed */}
         </View>
 
         <View style={{ height: 120 }} />
@@ -298,14 +287,17 @@ const s = StyleSheet.create({
   logoBox: { width: 58, height: 58, borderRadius: 18, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 5 },
   heroTitle: { fontSize: 30, fontWeight: '800', color: C.white, letterSpacing: -0.5, marginBottom: 8 },
   heroSub:   { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginBottom: 28, lineHeight: 20 },
-  demoHeading: { fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
-  demoRow:  { flexDirection: 'row', gap: 10 },
-  demoChip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(63,155,132,0.2)', borderWidth: 1, borderColor: 'rgba(63,155,132,0.4)' },
-  demoChipText: { fontSize: 13, fontWeight: '700', color: '#7dd3c0' },
+  heroMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  heroMetaChip: { backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  heroMetaText: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.88)' },
 
-  card: { backgroundColor: C.white, marginHorizontal: 16, marginTop: -24, borderRadius: 24, padding: 28, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
+  card: { backgroundColor: C.white, marginHorizontal: 16, marginTop: -24, borderRadius: 24, padding: 28, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 10, overflow: 'hidden' },
+  cardAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 6, backgroundColor: C.primary },
   cardTitle: { fontSize: 22, fontWeight: '800', color: C.g800, marginBottom: 4 },
   cardSub:   { fontSize: 14, color: C.g500, marginBottom: 24 },
+  /* demo styles removed */
+  sessionBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.primaryLt, borderRadius: 10, borderWidth: 1, borderColor: '#bbf7d0', padding: 12, marginBottom: 18 },
+  sessionText: { fontSize: 13, color: C.primaryDk, fontWeight: '600' },
 
   errorBox:  { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 10, padding: 12, marginBottom: 20 },
   errorText: { color: C.danger, fontSize: 13, fontWeight: '600', flex: 1 },
