@@ -383,6 +383,13 @@ function BookingCard({ item, isExpanded, onToggle }) {
               </TouchableOpacity>
             </View>
           )}
+          {item.status === 'approved' && (
+            <View style={s.actionRow}>
+              <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]} activeOpacity={0.8}>
+                <Text style={s.btnPrimaryText}>Return Vehicle</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           {item.status === 'completed' && (
             <View style={s.actionRow}>
               <TouchableOpacity style={s.btnOutline} activeOpacity={0.8}>
