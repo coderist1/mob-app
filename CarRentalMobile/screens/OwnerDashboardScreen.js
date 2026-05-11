@@ -116,12 +116,74 @@ function VehicleCard({ vehicle, onEdit, onDelete }) {
   );
 }
 
+/* ── Dropdown Selector ── */
+function DropdownField({ label, value, options, onSelect, placeholder }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <TouchableOpacity
+        onPress={() => setOpen(true)}
+        style={[s.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+      >
+        <Text style={{ fontSize: 14, color: value ? C.g900 : C.g400, flex: 1 }}>
+          {value || placeholder}
+        </Text>
+        <Text style={{ color: C.g400, fontSize: 12 }}>▼</Text>
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="fade">
+        <TouchableOpacity
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', paddingHorizontal: 32 }}
+          activeOpacity={1}
+          onPress={() => setOpen(false)}
+        >
+          <View style={{ backgroundColor: C.white, borderRadius: 14, overflow: 'hidden', maxHeight: 320 }}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: C.navy }}>{label}</Text>
+            </View>
+            <ScrollView>
+              {options.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => { onSelect(opt); setOpen(false); }}
+                  style={{
+                    padding: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#f3f4f6',
+                    backgroundColor: value === opt ? C.primaryLt : C.white,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: value === opt ? C.primaryDk : C.g900, fontWeight: value === opt ? '700' : '400' }}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
+}
+
 /* ── Vehicle Form Modal ── */
+const VEHICLE_TYPES        = ['Sedan','SUV','Hatchback','Pickup','Van','MPV','Crossover','Coupe','Sports'];
+const TRANSMISSION_OPTIONS = ['Automatic', 'Manual', 'CVT'];
+const FUEL_OPTIONS         = ['Gasoline', 'Diesel', 'Hybrid', 'Electric'];
+const LOCATION_OPTIONS     = [
+  'Manila', 'Quezon City', 'Cebu City', 'Davao City',
+  'Makati', 'Taguig', 'Pasig', 'Parañaque', 'Caloocan', 'Antipolo',
+];
+
 function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
-  const blank = { brand: '', name: '', model: '', year: '', type: '', transmission: '', pricePerDay: '', location: '', description: '', status: 'available', seats: '', fuel: '' };
-  const [form, setForm] = useState(initial || blank);
+  const blank = {
+    brand: '', name: '', model: '', year: String(new Date().getFullYear()),
+    type: '', transmission: '', pricePerDay: '', location: '',
+    description: '', status: 'available', seats: '5', fuel: '',
+  };
+  const [form, setForm]       = useState(initial || blank);
   const [photoUri, setPhotoUri] = useState((initial && initial.photoUri) || null);
-  // Ensure the form updates if `initial` is provided after `visible` changes
+
   React.useEffect(() => {
     if (visible) setForm(initial || blank);
   }, [visible, initial]);
@@ -129,8 +191,9 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
     if (visible) setPhotoUri((initial && initial.photoUri) || null);
   }, [visible, initial]);
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const MEDIA_IMAGES = ImagePicker.MediaType?.Images || 'images';
-  const PICKER_OPTIONS = { mediaTypes: [MEDIA_IMAGES], allowsEditing: true, aspect: [4,3], quality: 0.8 };
+
+  const MEDIA_IMAGES   = ImagePicker.MediaType?.Images || 'images';
+  const PICKER_OPTIONS = { mediaTypes: [MEDIA_IMAGES], allowsEditing: true, aspect: [4, 3], quality: 0.8 };
 
   async function ensurePermission(type) {
     if (type === 'camera') {
@@ -156,11 +219,16 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
   };
 
   const handleSave = () => {
-    if (!form.name.trim())  { Alert.alert('Required', 'Vehicle name is required.'); return; }
-    if (!form.pricePerDay)  { Alert.alert('Required', 'Price per day is required.'); return; }
-    const payload = { ...form, photoUri };
-    onSave(payload);
+    if (!form.brand.trim())      { Alert.alert('Required', 'Brand is required.');             return; }
+    if (!form.name.trim())       { Alert.alert('Required', 'Model/Name is required.');        return; }
+    if (!form.type)              { Alert.alert('Required', 'Vehicle type is required.');       return; }
+    if (!form.transmission)      { Alert.alert('Required', 'Transmission is required.');       return; }
+    if (!form.fuel)              { Alert.alert('Required', 'Fuel type is required.');          return; }
+    if (!form.location)          { Alert.alert('Required', 'Location is required.');           return; }
+    if (!form.pricePerDay)       { Alert.alert('Required', 'Price per day is required.');      return; }
+    onSave({ ...form, photoUri });
   };
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={{ flex: 1, backgroundColor: C.white }}>
@@ -168,9 +236,11 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
           <Text style={s.modalTitle}>{isEdit ? 'Edit Vehicle' : 'Add New Vehicle'}</Text>
           <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
         </View>
+
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-          {/* Image upload */}
-          <View style={{ marginBottom: 14 }} key="photo">
+
+          {/* Vehicle Photo */}
+          <View style={{ marginBottom: 18 }}>
             <Text style={s.fieldLabel}>Vehicle Photo</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {photoUri ? (
@@ -178,8 +248,8 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
                   <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 </View>
               ) : (
-                <View style={{ width: 100, height: 74, borderRadius: 8, backgroundColor: '#f3f6fb', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: C.g400 }}>No photo</Text>
+                <View style={{ width: 100, height: 74, borderRadius: 8, backgroundColor: '#f3f6fb', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#dbe3ee' }}>
+                  <Text style={{ color: C.g400, fontSize: 11 }}>No photo</Text>
                 </View>
               )}
               <View style={{ flex: 1 }}>
@@ -192,32 +262,101 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
               </View>
             </View>
           </View>
+
+          {/* Row: Brand / Model Name */}
           <View style={s.gridRow}>
-            {[
-              { key: 'brand',       label: 'Brand *',             placeholder: 'e.g. Toyota' },
-              { key: 'name',        label: 'Model/Name *',        placeholder: 'e.g. Vios' },
-              { key: 'year',        label: 'Year',                placeholder: 'e.g. 2022', numeric: true },
-              { key: 'type',        label: 'Type',                placeholder: 'e.g. Hatchback' },
-              { key: 'transmission',label: 'Transmission',        placeholder: 'e.g. Manual' },
-              { key: 'fuel',        label: 'Fuel Type',           placeholder: 'e.g. Diesel' },
-              { key: 'seats',       label: 'Seats',               placeholder: 'e.g. 5', numeric: true },
-              { key: 'pricePerDay', label: 'Price per Day (₱) *', placeholder: 'e.g. 2500', numeric: true },
-              { key: 'location',    label: 'Pickup Location',     placeholder: 'e.g. Davao City' },
-            ].map(f => (
-              <View key={f.key} style={s.halfWrap}>
-                <Text style={s.fieldLabel}>{f.label}</Text>
-                <TextInput style={s.input} placeholder={f.placeholder} placeholderTextColor={C.g400}
-                  value={String(form[f.key] || '')} onChangeText={v => set(f.key, v)}
-                  keyboardType={f.numeric ? 'numeric' : 'default'} />
-              </View>
-            ))}
-            <View style={s.fullWrap}>
-              <Text style={s.fieldLabel}>Description</Text>
-              <TextInput style={[s.input, { height: 100, textAlignVertical: 'top' }]} placeholder="Description"
-                placeholderTextColor={C.g400} value={String(form.description || '')} onChangeText={v => set('description', v)} multiline />
+            <View style={s.halfWrap}>
+              <Text style={s.fieldLabel}>Brand *</Text>
+              <TextInput style={s.input} placeholder="e.g. Toyota" placeholderTextColor={C.g400}
+                value={form.brand} onChangeText={v => set('brand', v)} />
+            </View>
+            <View style={s.halfWrap}>
+              <Text style={s.fieldLabel}>Model/Name *</Text>
+              <TextInput style={s.input} placeholder="e.g. Vios" placeholderTextColor={C.g400}
+                value={form.name} onChangeText={v => { set('name', v); set('model', v); }} />
             </View>
           </View>
-          <View style={{ marginBottom: 14 }}>
+
+          {/* Row: Year / Type */}
+          <View style={s.gridRow}>
+            <View style={s.halfWrap}>
+              <Text style={s.fieldLabel}>Year *</Text>
+              <TextInput style={s.input} placeholder="e.g. 2022" placeholderTextColor={C.g400}
+                value={String(form.year || '')} onChangeText={v => set('year', v)} keyboardType="numeric" />
+            </View>
+            <View style={s.halfWrap}>
+              <DropdownField
+                label="Type *"
+                value={form.type}
+                options={VEHICLE_TYPES}
+                onSelect={v => set('type', v)}
+                placeholder="Select Type"
+              />
+            </View>
+          </View>
+
+          {/* Row: Transmission / Fuel Type */}
+          <View style={s.gridRow}>
+            <View style={s.halfWrap}>
+              <DropdownField
+                label="Transmission *"
+                value={form.transmission}
+                options={TRANSMISSION_OPTIONS}
+                onSelect={v => set('transmission', v)}
+                placeholder="Select Transmission"
+              />
+            </View>
+            <View style={s.halfWrap}>
+              <DropdownField
+                label="Fuel Type *"
+                value={form.fuel}
+                options={FUEL_OPTIONS}
+                onSelect={v => set('fuel', v)}
+                placeholder="Select Fuel Type"
+              />
+            </View>
+          </View>
+
+          {/* Row: Seats / Price Per Day */}
+          <View style={s.gridRow}>
+            <View style={s.halfWrap}>
+              <Text style={s.fieldLabel}>Seats *</Text>
+              <TextInput style={s.input} placeholder="e.g. 5" placeholderTextColor={C.g400}
+                value={String(form.seats || '')} onChangeText={v => set('seats', v)} keyboardType="numeric" />
+            </View>
+            <View style={s.halfWrap}>
+              <Text style={s.fieldLabel}>Price Per Day (₱) *</Text>
+              <TextInput style={s.input} placeholder="e.g. 2500" placeholderTextColor={C.g400}
+                value={String(form.pricePerDay || '')} onChangeText={v => set('pricePerDay', v)} keyboardType="numeric" />
+            </View>
+          </View>
+
+          {/* Location dropdown — full width */}
+          <View style={s.fullWrap}>
+            <DropdownField
+              label="Location *"
+              value={form.location}
+              options={LOCATION_OPTIONS}
+              onSelect={v => set('location', v)}
+              placeholder="Select Location"
+            />
+          </View>
+
+          {/* Description — full width */}
+          <View style={s.fullWrap}>
+            <Text style={s.fieldLabel}>Description</Text>
+            <TextInput
+              style={[s.input, { height: 100, textAlignVertical: 'top' }]}
+              placeholder="Description"
+              placeholderTextColor={C.g400}
+              value={String(form.description || '')}
+              onChangeText={v => set('description', v)}
+              multiline
+            />
+          </View>
+
+          {/* Status toggle */}
+          <View style={{ marginBottom: 20 }}>
             <Text style={s.fieldLabel}>Status</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {['available', 'unavailable'].map(st => (
@@ -230,9 +369,11 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
               ))}
             </View>
           </View>
+
           <TouchableOpacity onPress={handleSave} style={s.btnPrimary}>
             <Text style={s.btnPrimaryText}>{isEdit ? 'Save Changes' : 'Add Vehicle'}</Text>
           </TouchableOpacity>
+
         </ScrollView>
       </View>
     </Modal>
