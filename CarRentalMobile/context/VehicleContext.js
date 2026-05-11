@@ -99,7 +99,60 @@ const toApiVehicle = (vehicleData) => {
 
 export function VehicleProvider({ children }) {
   const [vehicles, setVehicles] = useState([]);
+  const [savedCars, setSavedCars] = useState([]);
+  const [rentalHistory, setRentalHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // FIX: handle vehicle and renter as integer ID or nested object
+  const normalizeBooking = useCallback((booking) => {
+    if (!booking) return booking;
+    const rawVehicle = booking.vehicle;
+    const vehicleIdCandidate =
+      booking.vehicleId ??
+      (typeof rawVehicle === 'object' && rawVehicle !== null ? rawVehicle.id : rawVehicle);
+
+    // Resolve renter — may be integer FK, nested object, or missing
+    const rawRenter = booking.renter;
+    const renterIdRaw =
+      booking.renterId ??
+      (typeof rawRenter === 'object' && rawRenter !== null ? rawRenter.id : rawRenter);
+    const renterId = Number.isFinite(Number(renterIdRaw)) ? Number(renterIdRaw) : null;
+
+    // Resolve renterName from nested renter object if not already a string field
+    const renterNameFallback =
+      typeof rawRenter === 'object' && rawRenter !== null
+        ? (rawRenter.fullName || `${rawRenter.first_name ?? ''} ${rawRenter.last_name ?? ''}`.trim() || rawRenter.username || '')
+        : '';
+
+    // Build vehicle name from nested object if available
+    const vehicleNameFallback =
+      typeof rawVehicle === 'object' && rawVehicle !== null
+        ? `${rawVehicle.brand ?? ''} ${rawVehicle.model ?? ''}`.trim()
+        : '';
+
+    return {
+      ...booking,
+      id: Number(booking.id ?? booking._id ?? booking.pk),
+      vehicleId: Number(vehicleIdCandidate ?? NaN),
+      renterId,
+      startDate: booking.startDate ?? booking.start_date,
+      endDate: booking.endDate ?? booking.end_date,
+      amount: Number(booking.amount ?? booking.pricePerDay ?? 0),
+      vehicleName:
+        booking.vehicleName ||
+        booking.vehicle_name ||
+        booking.carName ||
+        vehicleNameFallback ||
+        'Vehicle',
+      ownerName: booking.ownerName || booking.owner_name || '',
+      renterName:
+        booking.renterName ||
+        booking.renter_name ||
+        booking.renter_full_name ||
+        renterNameFallback ||
+        '',
+    };
+  }, []);
 
   // Helper to update both React State and Local Storage at the same time
   const mutateVehicles = useCallback((updater) => {
@@ -148,18 +201,38 @@ export function VehicleProvider({ children }) {
     }
   }, [mutateVehicles]);
 
+  const loadBookings = useCallback(async () => {
+    try {
+      const data = await apiRequest('/api/bookings/');
+      setRentalHistory(Array.isArray(data) ? data.map(normalizeBooking) : []);
+    } catch (e) {
+      console.error('Error loading bookings:', e);
+      setRentalHistory([]);
+    }
+  }, [normalizeBooking]);
+
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       await loadVehicles();
+      await loadBookings();
       if (mounted) setLoading(false);
     })();
 
     return () => {
       mounted = false;
     };
-  }, [loadVehicles]);
+  }, [loadVehicles, loadBookings]);
+
+  // Poll every 8 seconds — replaces broken WebSocket real-time sync
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadVehicles();
+      loadBookings();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [loadVehicles, loadBookings]);
 
   const addVehicle = async (vehicleData, owner) => {
     const payloadObj = toApiVehicle(vehicleData);
@@ -292,6 +365,35 @@ export function VehicleProvider({ children }) {
     }
   };
 
+  const addRentalRecord = async (vehicle, renterInfo = {}) => {
+    const nowIso = new Date().toISOString();
+    const startDate = renterInfo.startDate || nowIso;
+    const endDate = renterInfo.endDate || null;
+    const newBookingData = {
+      vehicle: vehicle.id,
+      renter: renterInfo.id || null,
+      startDate,
+      start_date: startDate,
+      endDate,
+      end_date: endDate,
+      amount: vehicle.pricePerDay || 0,
+      status: 'pending',
+    };
+
+    try {
+      const createdBooking = await apiRequest('/api/bookings/', {
+        method: 'POST',
+        body: newBookingData,
+      });
+      const normalized = normalizeBooking(createdBooking);
+      setRentalHistory((prev) => [normalized, ...prev]);
+      return normalized;
+    } catch (error) {
+      console.error('Error adding rental record:', error);
+      return null;
+    }
+  };
+
   const approveVehicle = useCallback(() => {}, []);
   const rejectVehicle = useCallback(() => {}, []);
 
@@ -312,10 +414,13 @@ export function VehicleProvider({ children }) {
   return (
     <VehicleContext.Provider value={{
       vehicles,
+      savedCars,
+      rentalHistory,
       loading,
       addVehicle,
       updateVehicle,
       deleteVehicle,
+      addRentalRecord,
       refreshVehicles: loadVehicles,
       approveVehicle,
       rejectVehicle,
