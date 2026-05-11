@@ -279,7 +279,7 @@ function RentModal({ visible, vehicle, onClose, onConfirm }) {
   );
 }
 
-function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, onToggleSave }) {
+function HomeTab({ vehicles, bookings, addRentalRecord, user, savedVehicleIds, onToggleSave }) {
   const [search,     setSearch]     = useState('');
   const [filter,     setFilter]     = useState('all');
   const [rentModal,  setRentModal]  = useState(false);
@@ -303,29 +303,15 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
 
   const openRent = v => { setSelVehicle(v); setRentModal(true); };
 
-  const handleConfirmRent = data => {
+  const handleConfirmRent = async (data) => {
     if (!selVehicle) { Alert.alert('Error', 'No vehicle selected. Please try again.'); return; }
-    const newBooking = {
-      id:           `rent-${Date.now()}`,
-      vehicleId:    selVehicle.id,
-      vehicleName:  selVehicle.name,
-      vehicleModel: selVehicle.model,
-      ownerId:      selVehicle.ownerId,
-      ownerName:    selVehicle.ownerName,
-      renterEmail:  user?.email,
-      renterName:   user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Renter',
-      pricePerDay:  selVehicle.pricePerDay,
-      totalPrice:   data.total,
-      startDate:    data.startDate,
-      endDate:      data.endDate,
-      days:         data.days,
-      notes:        data.notes,
-      status:       'pending',
-      createdAt:    new Date().toISOString(),
-    };
-    onCreateBooking(newBooking);
-    setRentModal(false);
-    Alert.alert('Request Sent! 🎉', 'Your rental request has been submitted and is awaiting approval from the owner.');
+    const result = await addRentalRecord(selVehicle, { id: user.id, startDate: data.startDate, endDate: data.endDate });
+    if (result) {
+      setRentModal(false);
+      Alert.alert('Request Sent! 🎉', 'Your rental request has been submitted and is awaiting approval from the owner.');
+    } else {
+      Alert.alert('Error', 'Failed to submit rental request. Please try again.');
+    }
   };
 
   return (
@@ -390,7 +376,7 @@ export default function RenterDashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { addBooking, getBookingsForRenter } = useBookings();
-  const { getApprovedVehicles } = useVehicles(); // ← only approved vehicles
+  const { getApprovedVehicles, addRentalRecord } = useVehicles(); // ← only approved vehicles
 
   React.useEffect(() => {
     if (!user) router.replace('/login');
@@ -450,7 +436,7 @@ export default function RenterDashboardScreen() {
           <HomeTab
             vehicles={approvedVehicles}
             bookings={myRentals}
-            onCreateBooking={addBooking}
+            addRentalRecord={addRentalRecord}
             user={user}
             savedVehicleIds={savedVehicleIds}
             onToggleSave={toggleSaveVehicle}
