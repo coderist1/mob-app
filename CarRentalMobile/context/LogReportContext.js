@@ -15,196 +15,199 @@ try {
   console.warn('[LogReportContext] AsyncStorage not available. Data will not persist.');
 }
 
+// After the owner adds a checkout, mark the linked booking as completed.
+async function markBookingCompleted(rentalId) {
+  if (!rentalId) return;
+  const endpoints = [
+    `/api/bookings/${rentalId}/`,
+    `/api/rentals/${rentalId}/`,
+    `/api/reservations/${rentalId}/`,
+  ];
+  for (const ep of endpoints) {
+    try {
+      await apiRequest(ep, { method: 'PATCH', body: { status: 'completed' } });
+      return; // success — stop trying
+    } catch (_) {
+      // try next endpoint
+    }
+  }
+}
+
 const LOG_KEY = 'logReports';
 
 /* ─── Context ─── */
 const LogReportContext = createContext(null);
 
 export function LogReportProvider({ children }) {
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [reports, setReports] = useState([]); // Initialize as empty array
 
-  /* Load persisted reports on mount */
-  useEffect(() => {
-    (async () => {
-      try {
-        // 1) load local cache
-        if (AsyncStorage) {
-          const raw = await AsyncStorage.getItem(LOG_KEY);
-          if (raw) setReports(JSON.parse(raw));
-        }
-
-        // 2) try to fetch remote reports from several possible endpoints
-        const endpoints = ['/api/log-reports/', '/api/logs/', '/api/reports/'];
-        for (const ep of endpoints) {
-          try {
-            const data = await apiRequest(ep, { method: 'GET' });
-            if (Array.isArray(data)) {
-              setReports(data.map(d => ({ id: d.id ?? d.pk ?? `lr_${Date.now()}`, ...d })));
-              if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(data)).catch(()=>{});
-              break;
-            }
-          } catch (e) {
-            // try next
-          }
-        }
-      } catch (e) {
-        console.warn('[LogReportContext] load error', e);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  /* Persist helper */
-  const persist = useCallback(async (next) => {
-    setReports(next);
+  // New function to load log reports from API
+  const loadReports = useCallback(async () => {
     try {
-      if (AsyncStorage) await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
+      const data = await apiRequest('/api/logreports/'); // Assuming this endpoint exists
+      setReports(Array.isArray(data) ? data : []);
     } catch (e) {
-      console.warn('[LogReportContext] persist error', e);
+      console.error('Error loading log reports:', e);
+      setReports([]);
     }
   }, []);
 
-  /* ── CRUD ── */
+  // Initial load of reports
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
 
-  /** Create a new check-in report */
-  const addReport = useCallback(async (report) => {
-    const newReport = {
-      ...report,
-      id: report.id || `lr_${Date.now()}`,
-      createdAt: report.createdAt || new Date().toISOString(),
-      checkout: null,
-    };
+  // Poll every 8 seconds — replaces broken WebSocket real-time sync
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadReports();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [loadReports]);
 
-    // optimistic local add
-    setReports(prev => {
-      const next = prev.some(r => r.id === newReport.id) ? prev : [...prev, newReport];
-      try { if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(()=>{}); } catch(_){}
-      return next;
-    });
-
-    // attempt to persist remotely
-    (async () => {
-      const endpoints = ['/api/log-reports/', '/api/logs/', '/api/reports/'];
-      for (const ep of endpoints) {
-        try {
-          const created = await apiRequest(ep, { method: 'POST', body: report });
-          if (created) {
-            const normalized = { id: created.id ?? created.pk ?? newReport.id, ...created };
-            setReports(prev => prev.map(r => (String(r.id) === String(newReport.id) ? normalized : r)));
-            if (AsyncStorage) {
-              try {
-                const raw = await AsyncStorage.getItem(LOG_KEY);
-                const cur = raw ? JSON.parse(raw) : [];
-                const next = cur.map(r => (String(r.id) === String(newReport.id) ? normalized : r));
-                if (!next.some(r => String(r.id) === String(normalized.id))) next.push(normalized);
-                await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
-              } catch (_) {}
-            }
-          }
-          break;
-        } catch (e) {
-          // try next
-        }
-      }
-    })();
-
-    return newReport;
+  const createCheckin = useCallback(async (rental) => {
+    try {
+      const newReportData = {
+        type:        'checkin',
+        vehicleId:   rental.vehicleId,
+        vehicleName: rental.vehicleName,
+        rentalId:    rental.rentalId ?? rental.id,
+        renterName:  rental.renterName || '',
+        startDate:   rental.startDate,
+        endDate:     rental.endDate,
+        amount:      rental.amount,
+        ownerName:   rental.ownerName || '',
+        issues:      [],
+        notes:       '',
+        odometer:    '',
+        fuelLevel:   '',
+        photos:      [],
+        customLabels: {},
+        // Pass renterId under every alias the Django serializer checks
+        reporterId:  rental.renterId ?? rental.reporterId ?? null,
+        renterId:    rental.renterId ?? rental.reporterId ?? null,
+      };
+      const createdReport = await apiRequest('/api/logreports/', {
+        method: 'POST',
+        body: newReportData,
+      });
+      // The real-time event will update the state, but we can add it directly for immediate feedback
+      setReports((prev) => [...prev, createdReport]);
+      return createdReport;
+    } catch (error) {
+      console.error('Error creating checkin report:', error);
+      return null;
+    }
   }, []);
 
-  /** Add / update check-out on an existing report */
-  const addCheckout = useCallback(async (reportId, checkoutData) => {
-    setReports(prev => {
-      const next = prev.map(r =>
-        r.id === reportId
-          ? { ...r, checkout: { ...checkoutData, createdAt: new Date().toISOString() } }
-          : r
-      );
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-    // attempt to persist checkout to server
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logs/${reportId}/`, `/api/reports/${reportId}/`];
-      for (const ep of endpoints) {
-        try {
-          await apiRequest(ep, { method: 'PATCH', body: { checkout: checkoutData } });
-          break;
-        } catch (e) {}
-      }
-    })();
+  const editCheckin = useCallback(async (id, updates) => {
+    try {
+      const updatedReport = await apiRequest(`/api/logreports/${id}/`, {
+        method: 'PATCH',
+        body: updates,
+      });
+      setReports((prev) => prev.map((r) => (r.id === id ? updatedReport : r)));
+      return updatedReport;
+    } catch (error) {
+      console.error(`Error editing checkin report ${id}:`, error);
+      return null;
+    }
   }, []);
 
-  /** Update check-in fields on an existing report */
-  const updateReport = useCallback(async (reportId, updates) => {
-    setReports(prev => {
-      const next = prev.map(r => r.id === reportId ? { ...r, ...updates } : r);
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logs/${reportId}/`, `/api/reports/${reportId}/`];
-      for (const ep of endpoints) {
-        try {
-          await apiRequest(ep, { method: 'PATCH', body: updates });
-          break;
-        } catch (e) {}
+  const addCheckoutReport = useCallback(async (checkinId, data) => {
+    try {
+      let updatedReport;
+      try {
+        updatedReport = await apiRequest(`/api/logreports/${checkinId}/checkout/`, {
+          method: 'POST',
+          body: data,
+        });
+      } catch {
+        updatedReport = await apiRequest(`/api/logreports/${checkinId}/`, {
+          method: 'PATCH',
+          body: { checkout: data },
+        });
       }
-    })();
+      setReports((prev) => prev.map((r) => (r.id === checkinId ? updatedReport : r)));
+
+      // FIX: After the owner saves a checkout, automatically mark the linked
+      // booking as 'completed' so the renter sees the correct status.
+      const rentalId = updatedReport?.rentalId ?? updatedReport?.rental_id
+        ?? reports.find(r => r.id === checkinId)?.rentalId ?? null;
+      await markBookingCompleted(rentalId);
+
+      return updatedReport;
+    } catch (error) {
+      console.error(`Error adding checkout report for checkin ${checkinId}:`, error);
+      return null;
+    }
+  }, [reports]);
+
+  const editCheckout = useCallback(async (checkinId, updates) => {
+    try {
+      const updatedReport = await apiRequest(`/api/logreports/${checkinId}/`, {
+        method: 'PATCH',
+        body: { checkout: updates },
+      });
+      setReports((prev) => prev.map((r) => (r.id === checkinId ? updatedReport : r)));
+      return updatedReport;
+    } catch (error) {
+      console.error(`Error editing checkout for checkin ${checkinId}:`, error);
+      return null;
+    }
   }, []);
 
-  /** Delete a report */
-  const deleteReport = useCallback(async (reportId) => {
-    setReports(prev => {
-      const next = prev.filter(r => r.id !== reportId);
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logs/${reportId}/`, `/api/reports/${reportId}/`];
-      for (const ep of endpoints) {
-        try { await apiRequest(ep, { method: 'DELETE' }); break; } catch (e) {}
-      }
-    })();
+  const removeReport = useCallback(async (id) => {
+    try {
+      await apiRequest(`/api/logreports/${id}/`, {
+        method: 'DELETE',
+      });
+      setReports((prev) => prev.filter((r) => r.id !== id));
+    } catch (error) {
+      console.error(`Error removing report ${id}:`, error);
+    }
   }, []);
 
-  /** Add a comment to a report */
-  const addComment = useCallback(async (reportId, comment) => {
-    setReports(prev => {
-      const next = prev.map(r =>
-        r.id === reportId
-          ? { ...r, comments: [...(r.comments || []), { ...comment, id: `c_${Date.now()}`, createdAt: new Date().toISOString() }] }
-          : r
-      );
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-    // attempt to persist comment remotely
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/comments/`, `/api/logs/${reportId}/comments/`, `/api/reports/${reportId}/comments/`];
-      for (const ep of endpoints) {
-        try { await apiRequest(ep, { method: 'POST', body: comment }); break; } catch (e) {}
+  const postComment = useCallback(async (reportId, comment) => {
+    try {
+      let updatedReport;
+      try {
+        updatedReport = await apiRequest(`/api/logreports/${reportId}/comments/`, {
+          method: 'POST',
+          body: comment,
+        });
+      } catch {
+        updatedReport = await apiRequest(`/api/logreports/${reportId}/`, {
+          method: 'PATCH',
+          body: {
+            commentsAppend: {
+              ...comment,
+              createdAt: new Date().toISOString(),
+            },
+          },
+        });
       }
-    })();
+      setReports((prev) => prev.map((r) => (r.id === reportId ? updatedReport : r)));
+      return updatedReport;
+    } catch (error) {
+      console.error(`Error posting comment for report ${reportId}:`, error);
+      return null;
+    }
   }, []);
-
-  const value = {
-    reports,
-    loading,
-    addReport,
-    addCheckout,
-    updateReport,
-    deleteReport,
-    addComment,
-  };
 
   return (
-    <LogReportContext.Provider value={value}>
+    <LogReportContext.Provider value={{
+      reports,
+      refresh: loadReports, // refresh now triggers a full reload from API
+      createCheckin,
+      editCheckin,
+      addCheckoutReport,
+      editCheckout,
+      removeReport,
+      postComment,
+      getReportsForVehicle: useCallback((vehicleId) => reports.filter(r => String(r.vehicleId || r.vehicle) === String(vehicleId)), [reports]),
+      getReportsForRental: useCallback((rentalId) => reports.filter(r => String(r.rentalId || r.rental) === String(rentalId)), [reports]),
+    }}>
       {children}
     </LogReportContext.Provider>
   );
@@ -212,7 +215,7 @@ export function LogReportProvider({ children }) {
 
 export function useLogReport() {
   const ctx = useContext(LogReportContext);
-  if (!ctx) throw new Error('useLogReport must be used inside <LogReportProvider>');
+  if (!ctx) throw new Error('useLogReport must be used within LogReportProvider');
   return ctx;
 }
 
