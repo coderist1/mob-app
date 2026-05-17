@@ -60,11 +60,22 @@ const IcProfile = ({ color, size = 22 }) => (
   </Svg>
 );
 
+const IcFeedback = ({ color, size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <Circle cx="9" cy="10" r="1" />
+    <Circle cx="12" cy="10" r="1" />
+    <Circle cx="15" cy="10" r="1" />
+  </Svg>
+);
+
 const OWNER_TABS = [
   { key: 'home',      label: 'Home',       Icon: IcHome      },
   { key: 'rentals',   label: 'Rentals',    Icon: IcRentals   },
   { key: 'add',       label: 'Add',        Icon: IcPlus, isFab: true },
   { key: 'logreport', label: 'Log Report', Icon: IcLogReport },
+  { key: 'feedback',  label: 'Feedback',   Icon: IcFeedback  },
   { key: 'profile',   label: 'Profile',    Icon: IcProfile   },
 ];
 
@@ -72,6 +83,7 @@ const RENTER_TABS = [
   { key: 'home',      label: 'Home',       Icon: IcHome      },
   { key: 'bookings',  label: 'Bookings',   Icon: IcBookings  },
   { key: 'logreport', label: 'Log Report', Icon: IcLogReport },
+  { key: 'feedback',  label: 'Feedback',   Icon: IcFeedback  },
   { key: 'profile',   label: 'Profile',    Icon: IcProfile   },
 ];
 

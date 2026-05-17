@@ -590,7 +590,8 @@ export default function RenterDashboardScreen() {
   };
 
   const handleTabPress = tab => {
-    if (tab === 'profile') { router.push('/profile'); return; }
+    if (tab === 'profile')  { router.push('/profile'); return; }
+    if (tab === 'feedback') { router.push('/feedback'); return; }
     setActiveTab(tab);
   };
 

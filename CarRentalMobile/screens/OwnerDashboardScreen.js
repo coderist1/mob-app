@@ -769,8 +769,9 @@ export default function OwnerDashboardScreen() {
   };
 
   const handleTabPress = tab => {
-    if (tab === 'add')     { setShowAddModal(true); return; }
-    if (tab === 'profile') { router.push('/profile'); return; }
+    if (tab === 'add')      { setShowAddModal(true); return; }
+    if (tab === 'profile')  { router.push('/profile'); return; }
+    if (tab === 'feedback') { router.push('/feedback'); return; }
     setActiveTab(tab);
   };
 
