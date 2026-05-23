@@ -20,10 +20,18 @@ export function AuthProvider({ children }) {
         const session = await AsyncStorage.getItem(SESSION_KEY);
         if (!session) return;
 
-        const savedUser = JSON.parse(session);
+        const savedSession = JSON.parse(session);
+        const userData = { ...savedSession };
+        delete userData.token;
+        delete userData.access;
+        delete userData.authToken;
+        delete userData.key;
+        delete userData.jwt;
+        delete userData.accessToken;
+        delete userData.access_token;
+        
         if (!mounted) return;
-
-        setUser(savedUser);
+        setUser(userData);
       } catch {
         if (!mounted) return;
         await AsyncStorage.removeItem(SESSION_KEY);
@@ -38,9 +46,22 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const persistAuth = useCallback(async (nextUser) => {
-    setUser(nextUser);
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextUser));
+const persistAuth = useCallback(async (authData) => {
+    const token = authData?.token || authData?.access || authData?.authToken || authData?.key || authData?.jwt || authData?.accessToken || authData?.access_token;
+    const userData = { ...authData };
+    delete userData.token;
+    delete userData.access;
+    delete userData.authToken;
+    delete userData.key;
+    delete userData.jwt;
+    delete userData.accessToken;
+    delete userData.access_token;
+    
+    const session = { ...userData };
+    if (token) session.token = token;
+    
+    setUser(userData);
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
   }, []);
 
   const login = useCallback(async (email, password) => {
@@ -51,9 +72,8 @@ export function AuthProvider({ children }) {
         body: { username: normalizedEmail, password },
       });
 
-      // Accept the login data directly as the user profile since tokens are removed
       const me = loginData?.user || loginData;
-      await persistAuth(me);
+      await persistAuth(loginData);
       return { ok: true, user: me };
     } catch (error) {
       return { ok: false, error: error.message || 'Invalid email or password.' };
@@ -73,12 +93,12 @@ export function AuthProvider({ children }) {
           email: normalizedEmail,
           username: normalizedEmail,
           password,
-          firstName: userData?.firstName || '',
-          lastName: userData?.lastName || '',
-          middleName: userData?.middleName || '',
+          first_name: userData?.firstName || '',
+          last_name: userData?.lastName || '',
+          middle_name: userData?.middleName || '',
           role: userData?.role || 'renter',
           sex: userData?.sex || '',
-          dateOfBirth: userData?.dateOfBirth || null,
+          date_of_birth: userData?.dateOfBirth || null,
         },
       });
 
@@ -93,31 +113,74 @@ export function AuthProvider({ children }) {
     await AsyncStorage.removeItem(SESSION_KEY);
   }, []);
 
-  const updateUser = useCallback(async (partial) => {
+// In AuthContext.js, replace the updateUser function with this:
+
+const updateUser = useCallback(async (partial) => {
     try {
+      const payload = {};
+      const currentEmail = user?.email || user?.username || '';
+      const nextEmail = partial?.email ?? partial?.username ?? currentEmail;
+      console.log('[AuthContext] updateUser received:', partial);
+
+      if (partial?.firstName !== undefined) payload.first_name = partial.firstName;
+      if (partial?.lastName !== undefined) payload.last_name = partial.lastName;
+      if (partial?.middleName !== undefined) payload.middle_name = partial.middleName;
+      if (partial?.phone !== undefined) payload.phone = partial.phone;
+      if (partial?.photoUri !== undefined) payload.photo_uri = partial.photoUri;
+
+      if (partial?.first_name !== undefined) payload.first_name = partial.first_name;
+      if (partial?.last_name !== undefined) payload.last_name = partial.last_name;
+      if (partial?.middle_name !== undefined) payload.middle_name = partial.middle_name;
+      if (partial?.phone_number !== undefined) payload.phone = partial.phone_number;
+      if (partial?.photo_uri !== undefined) payload.photo_uri = partial.photo_uri;
+
+      if (partial?.email !== undefined || partial?.username !== undefined || currentEmail) {
+        payload.email = nextEmail;
+      }
+
+      if (partial?.username !== undefined) {
+        payload.username = partial.username;
+      } else if (payload.email) {
+        payload.username = payload.email;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        return user;
+      }
+
+      console.log('[AuthContext] Sending PATCH to /api/me/ with payload:', JSON.stringify(payload));
+
       const updated = await apiRequest('/api/me/', {
         method: 'PATCH',
-        body: {
-          email: user?.email,
-          username: user?.username || user?.email,
-          firstName: partial?.firstName,
-          lastName: partial?.lastName,
-          middleName: partial?.middleName,
-          sex: partial?.sex,
-          dateOfBirth: partial?.dateOfBirth,
-          photoUri: partial?.photoUri,
-        },
+        body: payload,
       });
 
+      console.log('[AuthContext] Update response:', updated);
+
       const nextUser = updated?.user || updated;
-      setUser(nextUser);
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextUser));
+      
+      // Normalize the response - prefer payload values (what we sent) over potentially stale API response
+      // This handles cases where API returns old/cached data
+      const normalizedResponse = {
+        ...nextUser,
+        firstName: payload.first_name ?? nextUser.firstName ?? nextUser.first_name ?? user?.firstName ?? '',
+        lastName: payload.last_name ?? nextUser.lastName ?? nextUser.last_name ?? user?.lastName ?? '',
+        middleName: payload.middle_name ?? nextUser.middleName ?? nextUser.middle_name ?? user?.middleName ?? '',
+        phone: payload.phone ?? nextUser.phone ?? nextUser.phoneNumber ?? nextUser.phone_number ?? user?.phone ?? '',
+        photoUri: payload.photo_uri ?? nextUser.photoUri ?? nextUser.photo_uri ?? user?.photoUri ?? '',
+      };
+
+      const mergedUser = { ...user, ...normalizedResponse };
+      setUser(mergedUser);
+      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(mergedUser));
+
+      return mergedUser;
     } catch (error) {
-      console.warn('[AuthContext] Failed to update user', error);
+      console.error('[AuthContext] Failed to update user:', error);
+      throw error;
     }
   }, [user]);
-
-  const updatePhoto = useCallback((uri) => updateUser({ photoUri: uri ?? null }), [updateUser]);
+  const updatePhoto = useCallback((uri) => updateUser({ photo_uri: uri ?? null }), [updateUser]);
 
   return (
     <AuthContext.Provider value={{ user, users: [], loading, login, register, logout, updateUser, updatePhoto }}>

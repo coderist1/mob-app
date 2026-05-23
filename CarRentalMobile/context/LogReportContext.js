@@ -32,8 +32,8 @@ export function LogReportProvider({ children }) {
         if (raw) setReports(JSON.parse(raw));
       }
 
-      // 2) try to fetch remote reports from several possible endpoints
-      const endpoints = ['/api/log-reports/', '/api/logs/', '/api/reports/'];
+       // 2) try to fetch remote reports from several possible endpoints
+      const endpoints = ['/api/log-reports/', '/api/logreports/', '/api/log_reports/'];
       for (const ep of endpoints) {
         try {
           const data = await apiRequest(ep, { method: 'GET' });
@@ -86,31 +86,31 @@ export function LogReportProvider({ children }) {
       return next;
     });
 
-    // attempt to persist remotely
-    (async () => {
-      const endpoints = ['/api/log-reports/', '/api/logs/', '/api/reports/'];
-      for (const ep of endpoints) {
-        try {
-          const created = await apiRequest(ep, { method: 'POST', body: report });
-          if (created) {
-            const normalized = { id: created.id ?? created.pk ?? newReport.id, ...created };
-            setReports(prev => prev.map(r => (String(r.id) === String(newReport.id) ? normalized : r)));
-            if (AsyncStorage) {
-              try {
-                const raw = await AsyncStorage.getItem(LOG_KEY);
-                const cur = raw ? JSON.parse(raw) : [];
-                const next = cur.map(r => (String(r.id) === String(newReport.id) ? normalized : r));
-                if (!next.some(r => String(r.id) === String(normalized.id))) next.push(normalized);
-                await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
-              } catch (_) {}
-            }
-          }
-          break;
-        } catch (e) {
-          // try next
-        }
-      }
-    })();
+     // attempt to persist remotely
+     (async () => {
+      const endpoints = ['/api/log-reports/', '/api/logreports/', '/api/log_reports/'];
+       for (const ep of endpoints) {
+         try {
+           const created = await apiRequest(ep, { method: 'POST', body: report });
+           if (created) {
+             const normalized = { id: created.id ?? created.pk ?? newReport.id, ...created };
+             setReports(prev => prev.map(r => (String(r.id) === String(newReport.id) ? normalized : r)));
+             if (AsyncStorage) {
+               try {
+                 const raw = await AsyncStorage.getItem(LOG_KEY);
+                 const cur = raw ? JSON.parse(raw) : [];
+                 const next = cur.map(r => (String(r.id) === String(newReport.id) ? normalized : r));
+                 if (!next.some(r => String(r.id) === String(normalized.id))) next.push(normalized);
+                 await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
+               } catch (_) {}
+             }
+           }
+           break;
+         } catch (e) {
+           // try next
+         }
+       }
+     })();
 
     return newReport;
   }, []);
@@ -127,16 +127,16 @@ export function LogReportProvider({ children }) {
       return next;
     });
 
-    // attempt to persist checkout to server
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logs/${reportId}/`, `/api/reports/${reportId}/`];
-      for (const ep of endpoints) {
-        try {
-          await apiRequest(ep, { method: 'PATCH', body: { checkout: checkoutData } });
-          break;
-        } catch (e) {}
-      }
-    })();
+     // attempt to persist checkout to server
+     (async () => {
+      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logreports/${reportId}/`, `/api/log_reports/${reportId}/`];
+       for (const ep of endpoints) {
+         try {
+           await apiRequest(ep, { method: 'PATCH', body: { checkout: checkoutData } });
+           break;
+         } catch (e) {}
+       }
+     })();
   }, []);
 
   /** Update check-in fields on an existing report */
@@ -147,15 +147,15 @@ export function LogReportProvider({ children }) {
       return next;
     });
 
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logs/${reportId}/`, `/api/reports/${reportId}/`];
-      for (const ep of endpoints) {
-        try {
-          await apiRequest(ep, { method: 'PATCH', body: updates });
-          break;
-        } catch (e) {}
-      }
-    })();
+     (async () => {
+      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logreports/${reportId}/`, `/api/log_reports/${reportId}/`];
+       for (const ep of endpoints) {
+         try {
+           await apiRequest(ep, { method: 'PATCH', body: updates });
+           break;
+         } catch (e) {}
+       }
+     })();
   }, []);
 
   /** Delete a report */
@@ -166,12 +166,12 @@ export function LogReportProvider({ children }) {
       return next;
     });
 
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logs/${reportId}/`, `/api/reports/${reportId}/`];
-      for (const ep of endpoints) {
-        try { await apiRequest(ep, { method: 'DELETE' }); break; } catch (e) {}
-      }
-    })();
+     (async () => {
+       const endpoints = [`/log-reports/${reportId}/`, `/logs/${reportId}/`, `/reports/${reportId}/`];
+       for (const ep of endpoints) {
+         try { await apiRequest(ep, { method: 'DELETE' }); break; } catch (e) {}
+       }
+     })();
   }, []);
 
   /** Add a comment to a report */
@@ -186,13 +186,13 @@ export function LogReportProvider({ children }) {
       return next;
     });
 
-    // attempt to persist comment remotely
-    (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/comments/`, `/api/logs/${reportId}/comments/`, `/api/reports/${reportId}/comments/`];
-      for (const ep of endpoints) {
-        try { await apiRequest(ep, { method: 'POST', body: comment }); break; } catch (e) {}
-      }
-    })();
+     // attempt to persist comment remotely
+     (async () => {
+      const endpoints = [`/api/log-reports/${reportId}/comments/`, `/api/logreports/${reportId}/comments/`, `/api/log_reports/${reportId}/comments/`];
+       for (const ep of endpoints) {
+         try { await apiRequest(ep, { method: 'POST', body: comment }); break; } catch (e) {}
+       }
+     })();
   }, []);
 
   const value = {

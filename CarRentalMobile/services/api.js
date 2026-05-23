@@ -57,23 +57,85 @@ function getExpoPackagerHost() {
 const expoPackagerHost = getExpoPackagerHost();
 const expoHostBase = expoPackagerHost ? normalizeApiBase(`${expoPackagerHost}:8000`) : null;
 const apiSource = process.env.EXPO_PUBLIC_API_URL || expoApiUrl || getDefaultApiBase();
-export const API_BASE = normalizeApiBase(apiSource);
+const API_BASE = normalizeApiBase(apiSource);
+
+// Debug logging
+console.log('[API Config] EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
+console.log('[API Config] expoApiUrl:', expoApiUrl);
+console.log('[API Config] expoPackagerHost:', expoPackagerHost);
+console.log('[API Config] expoHostBase:', expoHostBase);
+console.log('[API Config] apiSource:', apiSource);
+console.log('[API Config] API_BASE:', API_BASE);
 
 function toErrorMessage(payload, fallback) {
   if (!payload) return fallback;
   if (typeof payload === 'string') return payload;
-  if (payload.detail) return payload.detail;
-  const firstKey = Object.keys(payload)[0];
-  if (!firstKey) return fallback;
-  const firstValue = payload[firstKey];
-  if (Array.isArray(firstValue) && firstValue.length > 0) return String(firstValue[0]);
-  if (typeof firstValue === 'string') return firstValue;
-  return fallback;
+  
+  try {
+    const extract = (val) => {
+      if (!val) return null;
+      if (typeof val === 'string') return val;
+      if (Array.isArray(val)) {
+        const strings = val.map(extract).filter(Boolean);
+        return strings.length > 0 ? strings.join(', ') : null;
+      }
+      if (typeof val === 'object') {
+        // Handle FastAPI / Pydantic validation errors format
+        if (val.loc && val.msg) {
+          const field = Array.isArray(val.loc) ? val.loc[val.loc.length - 1] : val.loc;
+          return `${field}: ${val.msg}`;
+        }
+        if (val.detail) return extract(val.detail);
+        if (val.message) return extract(val.message);
+        if (val.msg) return extract(val.msg);
+        if (val.error) return extract(val.error);
+        if (val.non_field_errors) return extract(val.non_field_errors);
+        const keys = Object.keys(val);
+        for (const k of keys) {
+          const v = val[k];
+          if (Array.isArray(v)) {
+            const fieldErrors = v.map(e => {
+              if (typeof e === 'string') return `${k}: ${e}`;
+              if (e && typeof e === 'object' && e[0] && e[1]) return `${k}: ${e[0]} - ${e[1]}`;
+              return extract(e);
+            }).filter(Boolean);
+            if (fieldErrors.length) return fieldErrors.join('; ');
+          }
+        }
+        if (keys.length > 0) return extract(val[keys[0]]);
+      }
+      return String(val);
+    };
+    
+    const result = extract(payload);
+    return (result && typeof result === 'string') ? result : JSON.stringify(payload);
+  } catch (e) {
+    return fallback;
+  }
 }
 
 export async function apiRequest(path, options = {}) {
   const { body, headers = {}, ...rest } = options;
   const url = `${API_BASE}${path}`;
+
+  // Attach auth header from stored session if available
+  let authHeader = {};
+  try {
+    const sessRaw = await AsyncStorage.getItem(SESSION_KEY);
+    if (sessRaw) {
+      const sess = JSON.parse(sessRaw);
+      const token = sess?.token || sess?.access || sess?.authToken || sess?.key || sess?.jwt || sess?.accessToken || sess?.access_token || sess?.authorization || null;
+      if (token) {
+        // Some backends expect 'Token <key>' while others expect 'Bearer <jwt>'.
+        const headerValue = String(token).startsWith('Token ') || String(token).startsWith('Bearer ')
+          ? String(token)
+          : `Bearer ${String(token)}`;
+        authHeader = { Authorization: headerValue };
+      }
+    }
+  } catch (e) {
+    // ignore session read errors — proceed without auth
+  }
 
   const isFormData = body instanceof FormData;
   const defaultHeaders = isFormData ? {} : { 'Content-Type': 'application/json' };
@@ -85,6 +147,7 @@ export async function apiRequest(path, options = {}) {
       ...rest,
       headers: {
         ...defaultHeaders,
+        ...authHeader,
         ...headers,
       },
       body: isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),
@@ -103,6 +166,7 @@ export async function apiRequest(path, options = {}) {
           ...rest,
           headers: {
             ...defaultHeaders,
+            ...authHeader,
             ...headers,
           },
           body: isFormData ? body : (body !== undefined ? JSON.stringify(body) : undefined),

@@ -42,6 +42,7 @@ const fromApiVehicle = (vehicle) => {
   const status = vehicle.status || (vehicle.available ? 'available' : 'rented');
 
   let parsedOwnerId = vehicle.ownerId ?? vehicle.owner_id ?? vehicle.userId ?? vehicle.user_id ?? null;
+  let parsedOwnerEmail = vehicle.ownerEmail ?? vehicle.owner_email ?? null;
   let parsedOwnerName = vehicle.ownerName ?? vehicle.userName ?? '';
 
   // Safely extract the owner ID if the backend sends it simply as 'owner'
@@ -49,13 +50,19 @@ const fromApiVehicle = (vehicle) => {
   if (ownerData !== undefined && ownerData !== null) {
     if (typeof ownerData === 'object') {
       parsedOwnerId = parsedOwnerId ?? ownerData.id ?? ownerData.pk ?? ownerData.email;
+      parsedOwnerEmail = parsedOwnerEmail ?? ownerData.email ?? null;
       parsedOwnerName = parsedOwnerName || ownerData.username || ownerData.name || ownerData.fullName;
     } else if (!isNaN(Number(ownerData)) && typeof ownerData !== 'boolean') {
       parsedOwnerId = parsedOwnerId ?? ownerData;
     } else if (typeof ownerData === 'string') {
       parsedOwnerId = parsedOwnerId ?? ownerData;
+      if (ownerData.includes('@')) parsedOwnerEmail = parsedOwnerEmail ?? ownerData;
       parsedOwnerName = parsedOwnerName || ownerData;
     }
+  }
+
+  if (!parsedOwnerEmail && typeof parsedOwnerId === 'string' && parsedOwnerId.includes('@')) {
+    parsedOwnerEmail = parsedOwnerId;
   }
 
   return {
@@ -68,6 +75,7 @@ const fromApiVehicle = (vehicle) => {
     available: status === 'available',
     status,
     ownerId: parsedOwnerId,
+    ownerEmail: parsedOwnerEmail,
     ownerName: parsedOwnerName || 'Unknown Owner',
   };
 };
@@ -119,7 +127,7 @@ export function VehicleProvider({ children }) {
         setVehicles(localVehicles);
       }
 
-      // 2. Fetch from backend
+       // 2. Fetch from backend
       const data = await apiRequest('/api/cars/');
       console.warn('[VehicleContext] loadVehicles fetched', Array.isArray(data) ? data.length : 0, 'items');
       if (Array.isArray(data)) {
@@ -166,6 +174,7 @@ export function VehicleProvider({ children }) {
 
     // Resolve owner identifier from passed owner or from saved session as fallback
     let ownerIdentifier = owner?.id || owner?.pk || owner?.userId || owner?.email || null;
+    let ownerEmail = owner?.email || (typeof ownerIdentifier === 'string' && ownerIdentifier.includes('@') ? ownerIdentifier : null);
     let ownerName = owner?.firstName || owner?.fullName || owner?.username || owner?.email || null;
     if (!ownerIdentifier) {
       try {
@@ -173,6 +182,7 @@ export function VehicleProvider({ children }) {
         if (sess) {
           const sessUser = JSON.parse(sess);
           ownerIdentifier = ownerIdentifier || sessUser?.id || sessUser?.pk || sessUser?.userId || sessUser?.email || null;
+          ownerEmail = ownerEmail || sessUser?.email || (typeof ownerIdentifier === 'string' && ownerIdentifier.includes('@') ? ownerIdentifier : null);
           ownerName = ownerName || sessUser?.firstName || sessUser?.fullName || sessUser?.username || sessUser?.email || null;
           // also set owner object so local fallback works
           owner = owner || sessUser;
@@ -191,6 +201,11 @@ export function VehicleProvider({ children }) {
       payloadObj.user_id = ownerIdentifier;
       payloadObj.ownerEmail = ownerIdentifier;
       payloadObj.owner_email = ownerIdentifier;
+    }
+
+    if (ownerEmail) {
+      payloadObj.ownerEmail = ownerEmail;
+      payloadObj.owner_email = ownerEmail;
     }
 
     let payload = payloadObj;
@@ -282,14 +297,14 @@ export function VehicleProvider({ children }) {
   };
 
   const deleteVehicle = async (id) => {
-    try {
+     try {
       await apiRequest(`/api/cars/${id}/`, {
-        method: 'DELETE',
-      });
-      mutateVehicles((prev) => prev.filter((v) => v.id !== id));
-    } catch (error) {
-      console.warn('[VehicleContext] Failed to delete vehicle', error);
-    }
+         method: 'DELETE',
+       });
+       mutateVehicles((prev) => prev.filter((v) => v.id !== id));
+     } catch (error) {
+       console.warn('[VehicleContext] Failed to delete vehicle', error);
+     }
   };
 
   const approveVehicle = useCallback(() => {}, []);
@@ -298,7 +313,7 @@ export function VehicleProvider({ children }) {
   const getOwnerVehicles = useCallback((ownerId, ownerEmail) =>
     vehicles.filter((v) => {
       const matchId = ownerId && String(v.ownerId) === String(ownerId);
-      const matchEmail = ownerEmail && String(v.ownerId).toLowerCase() === String(ownerEmail).toLowerCase();
+      const matchEmail = ownerEmail && String(v.ownerEmail || '').toLowerCase() === String(ownerEmail).toLowerCase();
       return matchId || matchEmail;
     }),
   [vehicles]);

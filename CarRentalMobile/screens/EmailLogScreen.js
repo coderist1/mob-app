@@ -15,6 +15,8 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { useAuth } from '../context/AuthContext';
+import { useBookings } from '../context/BookingContext';
+import { apiRequest } from '../services/api';
 
 const C = {
   primary: '#3F9B84',
@@ -33,7 +35,7 @@ const C = {
   info: '#3b82f6',
 };
 
-const EMAIL_LOGS = [
+const DEMO_EMAIL_LOGS = [
   {
     id: 'e1',
     type: 'registration',
@@ -70,14 +72,108 @@ const TAB_LABELS = {
 export default function EmailLogScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { bookings, refreshBookings } = useBookings();
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [logs, setLogs] = useState(DEMO_EMAIL_LOGS);
+
+  const normalizeLog = (item) => ({
+    id: item.id ?? item.pk ?? `email_${Date.now()}`,
+    type: item.type ?? item.kind ?? item.category ?? 'rental',
+    to: item.to ?? item.recipient ?? item.email ?? item.toEmail ?? item.to_email ?? 'unknown',
+    subject: item.subject ?? item.title ?? 'Notification',
+    body: item.body ?? item.message ?? item.text ?? '',
+    sentAt: item.sentAt ?? item.sent_at ?? item.createdAt ?? item.created_at ?? new Date().toISOString(),
+  });
+
+  const buildLogsFromBookings = () => {
+    const generated = [];
+    bookings.forEach((booking) => {
+      const vehicleName = booking.vehicleName || booking.vehicleModel || 'vehicle';
+      const renterName = booking.renterName || booking.renterEmail || 'renter';
+      const ownerTarget = booking.ownerEmail || booking.ownerId || 'owner';
+      const renterTarget = booking.renterEmail || 'renter';
+      const timestamp = booking.updatedAt || booking.createdAt || new Date().toISOString();
+
+      if (booking.status === 'pending') {
+        generated.push({
+          id: `booking-${booking.id}-owner`,
+          type: 'rental',
+          to: ownerTarget,
+          subject: 'New booking request',
+          body: `${renterName} requested ${vehicleName} from ${booking.startDate || 'the selected date'} to ${booking.endDate || 'the selected date'}.`,
+          sentAt: timestamp,
+        });
+      }
+
+      if (booking.status === 'approved') {
+        generated.push({
+          id: `booking-${booking.id}-approved`,
+          type: 'rental',
+          to: renterTarget,
+          subject: 'Booking approved',
+          body: `Your request for ${vehicleName} was approved.`,
+          sentAt: timestamp,
+        });
+      }
+
+      if (booking.status === 'rejected') {
+        generated.push({
+          id: `booking-${booking.id}-rejected`,
+          type: 'rental',
+          to: renterTarget,
+          subject: 'Booking rejected',
+          body: booking.rejectionReason ? `Your request for ${vehicleName} was rejected: ${booking.rejectionReason}` : `Your request for ${vehicleName} was rejected.`,
+          sentAt: timestamp,
+        });
+      }
+
+      if (booking.status === 'completed') {
+        generated.push({
+          id: `booking-${booking.id}-completed`,
+          type: 'rental',
+          to: renterTarget,
+          subject: 'Rental completed',
+          body: `Your rental for ${vehicleName} has been marked complete.`,
+          sentAt: timestamp,
+        });
+      }
+    });
+
+    return generated.length > 0 ? generated.map(normalizeLog) : DEMO_EMAIL_LOGS;
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Simulate network delay since logs are static
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      if (typeof refreshBookings === 'function') {
+        await refreshBookings();
+      }
+
+       const endpoints = ['/email-logs/', '/emails/', '/notifications/', '/activity-logs/'];
+      let remote = null;
+
+      for (const endpoint of endpoints) {
+        try {
+          const data = await apiRequest(endpoint, { method: 'GET' });
+          if (Array.isArray(data)) {
+            remote = data;
+            break;
+          }
+        } catch {
+          // try next endpoint
+        }
+      }
+
+      if (remote) {
+        setLogs(remote.map(normalizeLog));
+      } else {
+        setLogs(buildLogsFromBookings());
+      }
+    } catch {
+      setLogs(buildLogsFromBookings());
+    }
     setRefreshing(false);
   };
 
@@ -88,7 +184,7 @@ export default function EmailLogScreen() {
   );
 
   const filtered = useMemo(() => {
-    let list = EMAIL_LOGS;
+    let list = logs;
     if (activeTab !== 'all') list = list.filter(item => item.type === activeTab);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -99,7 +195,7 @@ export default function EmailLogScreen() {
       );
     }
     return list.slice().sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
-  }, [activeTab, search]);
+  }, [activeTab, logs, search]);
 
   if (user?.role !== 'admin') {
     return (

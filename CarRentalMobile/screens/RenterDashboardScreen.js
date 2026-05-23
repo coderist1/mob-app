@@ -1,5 +1,5 @@
 // screens/RenterDashboardScreen.js
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Modal, StyleSheet, Alert, Platform, Image, RefreshControl,
@@ -19,84 +19,68 @@ import BookingsScreen from './BookingsScreen';
 import CalendarPicker from '../components/calendar-picker';
 
 const C = {
-  primary: '#3F9B84',
-  primaryDk: '#2d7a67',
-  primaryLt: '#ecfdf5',
-  navy: '#1a2c5e',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-  g50: '#f9fafb',
-  g100: '#f3f4f6',
-  g200: '#e5e7eb',
-  g300: '#d1d5db',
-  g400: '#9ca3af',
-  g500: '#6b7280',
-  g700: '#374151',
-  g900: '#111827',
-  white: '#ffffff',
+  primary: '#2D6A4F',
+  primaryLight: '#40916C',
+  primaryLighter: '#D8F3DC',
+  primaryBg: '#F0F9F4',
+  navy: '#1B2E35',
+  danger: '#E63946',
+  warning: '#F4A261',
+  success: '#2A9D8F',
+  info: '#4A9FF5',
+  white: '#FFFFFF',
+  black: '#0A0A0A',
+  gray50: '#F8F9FA',
+  gray100: '#F1F3F5',
+  gray200: '#E9ECEF',
+  gray300: '#DEE2E6',
+  gray400: '#CED4DA',
+  gray500: '#ADB5BD',
+  gray600: '#6C757D',
+  gray700: '#495057',
+  gray800: '#343A40',
+  gray900: '#212529',
 };
 
-const TAB_HEADERS = {
-  home: {
-    title: 'Renter Dashboard',
-    getSubtitle: (userName) => `Welcome back, ${userName}!`,
-    showAvatar: true,
-  },
-  bookings: {
-    title: 'My Bookings',
-    getSubtitle: () => 'Track your rental requests',
-    showAvatar: true,
-  },
-  logreport: {
-    title: 'Log & Report',
-    getSubtitle: () => 'Your rental conditions reported by owners',
-    showAvatar: true,
-  },
+const formatYMD = (d) => {
+  if (!(d instanceof Date)) d = new Date(d);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-function DashboardHeader({ activeTab, userName }) {
-  const config = TAB_HEADERS[activeTab] || TAB_HEADERS.home;
-  const subtitle = config.getSubtitle(userName);
-  return (
-    <View style={s.header}>
-      <View style={{ flex: 1 }}>
-        <Text style={s.headerKicker}>RENTER PORTAL</Text>
-        <Text style={s.headerTitle}>{config.title}</Text>
-        <Text style={s.headerSub}>{subtitle}</Text>
-      </View>
-      {config.showAvatar !== false && <ProfileAvatar size={38} />}
-    </View>
-  );
-}
+const parseYMD = (s) => {
+  if (!s) return null;
+  const [y, m, d] = String(s).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+};
 
-// ==================== NEW: VEHICLE DETAIL MODAL ====================
 function VehicleDetailModal({ visible, vehicle, onClose, onRent }) {
   if (!vehicle) return null;
+
+  const photoUri = vehicle.photoUri;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <View style={s.modalHeader}>
-          <Text style={s.modalTitle}>Vehicle Details</Text>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Vehicle Details</Text>
           <TouchableOpacity onPress={onClose}>
-            <Text style={s.modalClose}>✕</Text>
+            <Text style={styles.modalClose}>✕</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView>
-          {/* Large Image */}
           <View style={{ height: 280, backgroundColor: '#f3f6fb' }}>
-            {vehicle.photoUri ? (
+            {photoUri ? (
               <Image
-                source={{ uri: vehicle.photoUri }}
+                source={{ uri: photoUri }}
                 style={{ width: '100%', height: '100%' }}
                 resizeMode="cover"
               />
             ) : (
               <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: 80 }}>🚗</Text>
-                <Text style={{ color: C.g400, marginTop: 12, fontSize: 16 }}>No photo available</Text>
+                <Text style={{ fontSize: 64, color: C.gray400 }}>Car</Text>
+                <Text style={{ color: C.gray400, marginTop: 12, fontSize: 16 }}>No photo available</Text>
               </View>
             )}
           </View>
@@ -105,7 +89,7 @@ function VehicleDetailModal({ visible, vehicle, onClose, onRent }) {
             <Text style={{ fontSize: 24, fontWeight: '800', color: C.navy }}>
               {vehicle.name || 'Unnamed Vehicle'}
             </Text>
-            <Text style={{ fontSize: 16, color: C.g500, marginTop: 4 }}>
+            <Text style={{ fontSize: 16, color: C.gray500, marginTop: 4 }}>
               {vehicle.model} • {vehicle.year}
             </Text>
 
@@ -114,25 +98,25 @@ function VehicleDetailModal({ visible, vehicle, onClose, onRent }) {
             </Text>
 
             <View style={{ marginVertical: 20 }}>
-              <View style={s.vehicleChipRow}>
+              <View style={styles.vehicleChipRow}>
                 {vehicle.seats && (
-                  <View style={s.vehicleInfoChip}>
-                    <Text style={s.vehicleInfoChipText}>{vehicle.seats} Seats</Text>
+                  <View style={styles.vehicleInfoChip}>
+                    <Text style={styles.vehicleInfoChipText}>{vehicle.seats} Seats</Text>
                   </View>
                 )}
                 {vehicle.fuel && (
-                  <View style={s.vehicleInfoChip}>
-                    <Text style={s.vehicleInfoChipText}>{vehicle.fuel}</Text>
+                  <View style={styles.vehicleInfoChip}>
+                    <Text style={styles.vehicleInfoChipText}>{vehicle.fuel}</Text>
                   </View>
                 )}
                 {vehicle.location && (
-                  <View style={s.vehicleInfoChip}>
-                    <Text style={s.vehicleInfoChipText}>{vehicle.location}</Text>
+                  <View style={styles.vehicleInfoChip}>
+                    <Text style={styles.vehicleInfoChipText}>{vehicle.location}</Text>
                   </View>
                 )}
                 {vehicle.ownerName && (
-                  <View style={s.vehicleInfoChip}>
-                    <Text style={s.vehicleInfoChipText}>Owner: {vehicle.ownerName}</Text>
+                  <View style={styles.vehicleInfoChip}>
+                    <Text style={styles.vehicleInfoChipText}>Owner: {vehicle.ownerName}</Text>
                   </View>
                 )}
               </View>
@@ -140,8 +124,8 @@ function VehicleDetailModal({ visible, vehicle, onClose, onRent }) {
 
             {vehicle.description && (
               <View style={{ marginBottom: 24 }}>
-                <Text style={s.fieldLabel}>Description</Text>
-                <Text style={{ fontSize: 15, lineHeight: 22, color: C.g700 }}>
+                <Text style={styles.fieldLabel}>Description</Text>
+                <Text style={{ fontSize: 15, lineHeight: 22, color: C.gray700 }}>
                   {vehicle.description}
                 </Text>
               </View>
@@ -151,11 +135,11 @@ function VehicleDetailModal({ visible, vehicle, onClose, onRent }) {
               onPress={() => onRent(vehicle)}
               disabled={vehicle.status !== 'available'}
               style={[
-                s.btnPrimary,
-                vehicle.status !== 'available' && { backgroundColor: C.g400 }
+                styles.btnPrimary,
+                vehicle.status !== 'available' && { backgroundColor: C.gray400 }
               ]}
             >
-              <Text style={s.btnPrimaryText}>
+              <Text style={styles.btnPrimaryText}>
                 {vehicle.status === 'available' ? 'Rent This Vehicle' : 'Currently Not Available'}
               </Text>
             </TouchableOpacity>
@@ -166,7 +150,6 @@ function VehicleDetailModal({ visible, vehicle, onClose, onRent }) {
   );
 }
 
-// ==================== UPDATED: VEHICLE CARD ====================
 function VehicleCard({ vehicle, onRent, isSaved, onToggleSave, onPress }) {
   const available = vehicle.status === 'available';
   const vehicleName = vehicle.name || 'Unnamed Vehicle';
@@ -175,65 +158,72 @@ function VehicleCard({ vehicle, onRent, isSaved, onToggleSave, onPress }) {
   const seatsLabel = vehicle.seats ? `${vehicle.seats} seats` : 'Seats n/a';
   const fuelLabel = vehicle.fuel || 'Fuel n/a';
   const ownerLabel = vehicle.ownerName || 'Owner n/a';
+  
+  // Get the photo URI - already processed by VehicleContext
+  const photoUri = vehicle.photoUri;
 
   return (
     <TouchableOpacity
-      style={s.vehicleCard}
+      style={styles.vehicleCard}
       onPress={onPress}
       activeOpacity={0.9}
     >
-      <View style={s.vehicleImageWrap}>
-        {vehicle.photoUri ? (
-          <Image source={{ uri: vehicle.photoUri }} style={s.vehicleImage} resizeMode="cover" />
+      <View style={styles.vehicleImageWrap}>
+        {photoUri ? (
+          <Image 
+            source={{ uri: photoUri }} 
+            style={styles.vehicleImage} 
+            resizeMode="cover"
+          />
         ) : (
-          <View style={[s.vehicleImage, s.vehicleThumbFallback]}>
-            <Text style={s.vehicleThumbFallbackText}>No Image</Text>
+          <View style={[styles.vehicleImage, styles.vehicleThumbFallback]}>
+            <Text style={styles.vehicleThumbFallbackText}>Car</Text>
           </View>
         )}
-        <View style={[s.vehicleStatusPill, { backgroundColor: available ? '#d1fae5' : '#fef3c7' }]}>
-          <Text style={[s.vehicleStatusPillText, { color: available ? '#065f46' : '#92400e' }]}>
+        <View style={[styles.vehicleStatusPill, { backgroundColor: available ? '#E3FCF2' : '#FFF3E0' }]}>
+          <Text style={[styles.vehicleStatusPillText, { color: available ? C.primary : C.warning }]}>
             {available ? 'Available' : 'Rented'}
           </Text>
         </View>
       </View>
 
-      <View style={s.vehicleBody}>
-        <View style={s.vehicleTopRow}>
-          <Text style={s.vehicleName}>{vehicleName}</Text>
-          <View style={s.yearPill}><Text style={s.yearPillText}>{yearLabel}</Text></View>
+      <View style={styles.vehicleBody}>
+        <View style={styles.vehicleTopRow}>
+          <Text style={styles.vehicleName}>{vehicleName}</Text>
+          <View style={styles.yearPill}><Text style={styles.yearPillText}>{yearLabel}</Text></View>
         </View>
 
-        <View style={s.vehicleChipRow}>
-          <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{modelLabel}</Text></View>
-          <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{seatsLabel}</Text></View>
-          <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{fuelLabel}</Text></View>
-          <View style={s.vehicleInfoChip}><Text style={s.vehicleInfoChipText}>{ownerLabel}</Text></View>
+        <View style={styles.vehicleChipRow}>
+          <View style={styles.vehicleInfoChip}><Text style={styles.vehicleInfoChipText}>{modelLabel}</Text></View>
+          <View style={styles.vehicleInfoChip}><Text style={styles.vehicleInfoChipText}>{seatsLabel}</Text></View>
+          <View style={styles.vehicleInfoChip}><Text style={styles.vehicleInfoChipText}>{fuelLabel}</Text></View>
+          <View style={styles.vehicleInfoChip}><Text style={styles.vehicleInfoChipText}>{ownerLabel}</Text></View>
         </View>
 
-        {vehicle.location ? <Text style={s.vehicleLocation}>{vehicle.location}</Text> : null}
+        {vehicle.location ? <Text style={styles.vehicleLocation}>{vehicle.location}</Text> : null}
 
-        <View style={s.vehicleDivider} />
+        <View style={styles.vehicleDivider} />
 
-        <View style={s.vehicleFooter}>
-          <Text style={s.vehiclePrice}>
+        <View style={styles.vehicleFooter}>
+          <Text style={styles.vehiclePrice}>
             ₱{parseFloat(vehicle.pricePerDay).toLocaleString()}
-            <Text style={s.vehiclePricePer}>/day</Text>
+            <Text style={styles.vehiclePricePer}>/day</Text>
           </Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onToggleSave(vehicle.id); }}
-              style={[s.saveBtn, isSaved && s.saveBtnActive]}
+              style={[styles.saveBtn, isSaved && styles.saveBtnActive]}
             >
-              <Text style={[s.saveBtnText, isSaved && s.saveBtnTextActive]}>
+              <Text style={[styles.saveBtnText, isSaved && styles.saveBtnTextActive]}>
                 {isSaved ? 'Saved' : 'Save'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={(e) => { e.stopPropagation(); onRent(vehicle); }}
               disabled={!available}
-              style={[s.rentBtn, !available && s.rentBtnDisabled]}
+              style={[styles.rentBtn, !available && styles.rentBtnDisabled]}
             >
-              <Text style={[s.rentBtnText, !available && { color: C.g400 }]}>
+              <Text style={[styles.rentBtnText, !available && { color: C.gray400 }]}>
                 {available ? 'Rent Now' : 'Taken'}
               </Text>
             </TouchableOpacity>
@@ -244,8 +234,132 @@ function VehicleCard({ vehicle, onRent, isSaved, onToggleSave, onPress }) {
   );
 }
 
-// ==================== HomeTab ====================
-function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, onToggleSave, refreshing, onRefresh }) {
+function RentModal({ visible, vehicle, onClose, onConfirm }) {
+  const [startDate, setStart] = useState('');
+  const [endDate, setEnd] = useState('');
+  const [notes, setNotes] = useState('');
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [calendarTarget, setCalendarTarget] = useState(null);
+
+  useEffect(() => {
+    if (visible) { setStart(''); setEnd(''); setNotes(''); }
+  }, [visible]);
+
+  const days = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    const s = parseYMD(startDate);
+    const e = parseYMD(endDate);
+    if (!s || !e) return 0;
+    const diff = e - s;
+    return Math.max(0, Math.ceil(diff / 86400000));
+  }, [startDate, endDate]);
+
+  const total = days * (parseFloat(vehicle?.pricePerDay) || 0);
+
+  const handleConfirm = () => {
+    if (!startDate || !endDate) { Alert.alert('Required', 'Please enter both start and end dates.'); return; }
+    if (days <= 0) { Alert.alert('Invalid', 'End date must be after start date.'); return; }
+    onConfirm({ startDate, endDate, days, total, notes });
+  };
+
+  if (!vehicle) return null;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+      <View style={{ flex: 1, backgroundColor: C.white }}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Rent Vehicle</Text>
+          <TouchableOpacity onPress={onClose}><Text style={styles.modalClose}>✕</Text></TouchableOpacity>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <View style={{
+            backgroundColor: C.primaryLighter, borderRadius: 12,
+            borderWidth: 1, borderColor: C.primary + '28',
+            padding: 14, marginBottom: 20,
+          }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>{vehicle.name}</Text>
+            <Text style={{ fontSize: 13, color: C.gray500, marginTop: 2 }}>{vehicle.model} · {vehicle.year}</Text>
+            {vehicle.ownerName && (
+              <Text style={{ fontSize: 12, color: C.gray500, marginTop: 2 }}>Owner: {vehicle.ownerName}</Text>
+            )}
+            <Text style={{ fontSize: 14, color: C.primary, fontWeight: '700', marginTop: 6 }}>
+              ₱{parseFloat(vehicle.pricePerDay).toLocaleString()}/day
+            </Text>
+          </View>
+
+          <View style={{ marginBottom: 14 }}>
+            <Text style={styles.fieldLabel}>Start Date</Text>
+            <TouchableOpacity onPress={() => { setCalendarTarget('start'); setCalendarVisible(true); }} style={styles.dateRow}>
+              <Text style={styles.dateIcon}>📅</Text>
+              <Text style={[styles.dateInput, { color: startDate ? C.gray900 : C.gray400 }]}>
+                {startDate || 'Select start date'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ marginBottom: 14 }}>
+            <Text style={styles.fieldLabel}>End Date</Text>
+            <TouchableOpacity onPress={() => { setCalendarTarget('end'); setCalendarVisible(true); }} style={styles.dateRow}>
+              <Text style={styles.dateIcon}>📅</Text>
+              <Text style={[styles.dateInput, { color: endDate ? C.gray900 : C.gray400 }]}>
+                {endDate || 'Select end date'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ marginBottom: 20 }}>
+            <Text style={styles.fieldLabel}>Notes (optional)</Text>
+            <TextInput
+              style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
+              multiline placeholder="Any special requests…"
+              placeholderTextColor={C.gray400} value={notes} onChangeText={setNotes}
+            />
+          </View>
+
+          {days > 0 && (
+            <View style={{
+              backgroundColor: C.gray50, borderRadius: 12,
+              borderWidth: 1, borderColor: C.gray200,
+              padding: 14, marginBottom: 20,
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 13, color: C.gray500 }}>Duration</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: C.gray700 }}>{days} day{days > 1 ? 's' : ''}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 13, color: C.gray500 }}>Rate</Text>
+                <Text style={{ fontSize: 13, color: C.gray700 }}>₱{parseFloat(vehicle.pricePerDay).toLocaleString()}/day</Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: C.gray200, marginVertical: 8 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: C.navy }}>Total</Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: C.primary }}>₱{total.toLocaleString()}</Text>
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity onPress={handleConfirm} style={styles.btnPrimary}>
+            <Text style={styles.btnPrimaryText}>Submit Rental Request</Text>
+          </TouchableOpacity>
+
+          <CalendarPicker
+            visible={calendarVisible}
+            initialDate={(calendarTarget === 'start' && startDate) ? parseYMD(startDate) : (calendarTarget === 'end' && endDate) ? parseYMD(endDate) : new Date()}
+            onClose={() => setCalendarVisible(false)}
+            onSelect={(d) => {
+              const ymd = formatYMD(d);
+              if (calendarTarget === 'start') setStart(ymd);
+              else if (calendarTarget === 'end') setEnd(ymd);
+              setCalendarVisible(false);
+            }}
+          />
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+function HomeTab({ vehicles, onCreateBooking, user, savedVehicleIds, onToggleSave, refreshing, onRefresh }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [rentModal, setRentModal] = useState(false);
@@ -283,13 +397,20 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
       Alert.alert('Error', 'No vehicle selected. Please try again.');
       return;
     }
+    
+    // Get the photo URI from the vehicle object - it's already processed by VehicleContext
+    // The vehicle object already has a 'photoUri' property from fromApiVehicle()
+    const vehiclePhotoUri = selVehicle.photoUri || null;
+    
     const newBooking = {
       id: `rent-${Date.now()}`,
       vehicleId: selVehicle.id,
-      vehicleName: selVehicle.name,
-      vehicleModel: selVehicle.model,
+      vehicleName: selVehicle.name || selVehicle.model || 'Vehicle',
+      vehicleModel: selVehicle.model || selVehicle.name || '',
+      vehiclePhotoUri: vehiclePhotoUri,  // Use the photo URI from the vehicle
+      year: selVehicle.year,
       ownerId: selVehicle.ownerId,
-      ownerName: selVehicle.ownerName,
+      ownerName: selVehicle.ownerName || 'Owner',
       renterEmail: user?.email,
       renterName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Renter',
       pricePerDay: selVehicle.pricePerDay,
@@ -303,7 +424,7 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
     };
     onCreateBooking(newBooking);
     setRentModal(false);
-    Alert.alert('Request Sent! 🎉', 'Your rental request has been submitted and is awaiting approval from the owner.');
+    Alert.alert('Request Sent', 'Your rental request has been submitted and is awaiting approval from the owner.');
   };
 
   return (
@@ -313,11 +434,11 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={{ padding: 16 }}>
-        <View style={s.searchWrap}>
+        <View style={styles.searchWrap}>
           <TextInput
-            style={s.searchInput}
+            style={styles.searchInput}
             placeholder="Search vehicles, location, owner…"
-            placeholderTextColor={C.g400}
+            placeholderTextColor={C.gray400}
             value={search}
             onChangeText={setSearch}
           />
@@ -328,9 +449,9 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
             <TouchableOpacity
               key={f}
               onPress={() => setFilter(f)}
-              style={[s.filterTab, filter === f && s.filterTabActive]}
+              style={[styles.filterTab, filter === f && styles.filterTabActive]}
             >
-              <Text style={[s.filterTabText, filter === f && s.filterTabTextActive]}>
+              <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
                 {f === 'all' ? 'All Vehicles' : f === 'available' ? 'Available Only' : `Saved (${savedVehicleIds.length})`}
               </Text>
             </TouchableOpacity>
@@ -338,16 +459,14 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
         </View>
 
         {vehicles.length === 0 ? (
-          <View style={s.empty}>
-            <Text style={{ fontSize: 40, marginBottom: 10 }}>🚗</Text>
-            <Text style={s.emptyTitle}>No vehicles listed yet</Text>
-            <Text style={s.emptySub}>No approved vehicles available. Check back soon!</Text>
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>No vehicles listed yet</Text>
+            <Text style={styles.emptySub}>No approved vehicles available. Check back soon!</Text>
           </View>
         ) : filtered.length === 0 ? (
-          <View style={s.empty}>
-            <Text style={{ fontSize: 40, marginBottom: 10 }}>🔍</Text>
-            <Text style={s.emptyTitle}>{filter === 'saved' ? 'No saved vehicles yet' : 'No vehicles found'}</Text>
-            <Text style={s.emptySub}>{filter === 'saved' ? 'Tap Save on a car to add it here.' : 'Try adjusting your search filters.'}</Text>
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>{filter === 'saved' ? 'No saved vehicles yet' : 'No vehicles found'}</Text>
+            <Text style={styles.emptySub}>{filter === 'saved' ? 'Tap Save on a car to add it here.' : 'Try adjusting your search filters.'}</Text>
           </View>
         ) : (
           filtered.map(v => (
@@ -363,7 +482,6 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
         )}
       </View>
 
-      {/* Rent Modal */}
       <RentModal
         visible={rentModal}
         vehicle={selVehicle}
@@ -371,7 +489,6 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
         onConfirm={handleConfirmRent}
       />
 
-      {/* Vehicle Detail Modal */}
       <VehicleDetailModal
         visible={detailModal}
         vehicle={selVehicle}
@@ -385,146 +502,6 @@ function HomeTab({ vehicles, bookings, onCreateBooking, user, savedVehicleIds, o
   );
 }
 
-// ==================== RentModal (unchanged) ====================
-function RentModal({ visible, vehicle, onClose, onConfirm }) {
-  const [startDate, setStart] = useState('');
-  const [endDate, setEnd] = useState('');
-  const [notes, setNotes] = useState('');
-  const [calendarVisible, setCalendarVisible] = useState(false);
-  const [calendarTarget, setCalendarTarget] = useState(null);
-
-  const pad = (v) => String(v).padStart(2, '0');
-  const formatYMD = (d) => {
-    if (!(d instanceof Date)) d = new Date(d);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  };
-  const parseYMD = (s) => {
-    if (!s) return null;
-    const [y, m, d] = String(s).split('-').map(Number);
-    if (!y || !m || !d) return null;
-    return new Date(y, m - 1, d);
-  };
-
-  React.useEffect(() => {
-    if (visible) { setStart(''); setEnd(''); setNotes(''); }
-  }, [visible]);
-
-  const days = useMemo(() => {
-    if (!startDate || !endDate) return 0;
-    const s = parseYMD(startDate);
-    const e = parseYMD(endDate);
-    if (!s || !e) return 0;
-    const diff = e - s;
-    return Math.max(0, Math.ceil(diff / 86400000));
-  }, [startDate, endDate]);
-
-  const total = days * (parseFloat(vehicle?.pricePerDay) || 0);
-
-  const handleConfirm = () => {
-    if (!startDate || !endDate) { Alert.alert('Required', 'Please enter both start and end dates.'); return; }
-    if (days <= 0) { Alert.alert('Invalid', 'End date must be after start date.'); return; }
-    onConfirm({ startDate, endDate, days, total, notes });
-  };
-
-  if (!vehicle) return null;
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <View style={{ flex: 1, backgroundColor: C.white }}>
-        <View style={s.modalHeader}>
-          <Text style={s.modalTitle}>Rent Vehicle</Text>
-          <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 20 }}>
-          {/* ... RentModal content remains the same ... */}
-          <View style={{
-            backgroundColor: C.primaryLt, borderRadius: 12,
-            borderWidth: 1, borderColor: C.primary + '28',
-            padding: 14, marginBottom: 20,
-          }}>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: C.navy }}>{vehicle.name}</Text>
-            <Text style={{ fontSize: 13, color: C.g500, marginTop: 2 }}>{vehicle.model} · {vehicle.year}</Text>
-            {vehicle.ownerName && (
-              <Text style={{ fontSize: 12, color: C.g500, marginTop: 2 }}>Owner: {vehicle.ownerName}</Text>
-            )}
-            <Text style={{ fontSize: 14, color: C.primary, fontWeight: '700', marginTop: 6 }}>
-              ₱{parseFloat(vehicle.pricePerDay).toLocaleString()}/day
-            </Text>
-          </View>
-
-          <View style={{ marginBottom: 14 }}>
-            <Text style={s.fieldLabel}>Start Date</Text>
-            <TouchableOpacity onPress={() => { setCalendarTarget('start'); setCalendarVisible(true); }} style={s.dateRow}>
-              <Text style={s.dateIcon}>📅</Text>
-              <Text style={[s.dateInput, { color: startDate ? C.g900 : C.g400 }]}>
-                {startDate || 'Select start date'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ marginBottom: 14 }}>
-            <Text style={s.fieldLabel}>End Date</Text>
-            <TouchableOpacity onPress={() => { setCalendarTarget('end'); setCalendarVisible(true); }} style={s.dateRow}>
-              <Text style={s.dateIcon}>📅</Text>
-              <Text style={[s.dateInput, { color: endDate ? C.g900 : C.g400 }]}>
-                {endDate || 'Select end date'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ marginBottom: 20 }}>
-            <Text style={s.fieldLabel}>Notes (optional)</Text>
-            <TextInput
-              style={[s.input, { height: 70, textAlignVertical: 'top' }]}
-              multiline placeholder="Any special requests…"
-              placeholderTextColor={C.g400} value={notes} onChangeText={setNotes}
-            />
-          </View>
-
-          {days > 0 && (
-            <View style={{
-              backgroundColor: C.g50, borderRadius: 12,
-              borderWidth: 1, borderColor: C.g200,
-              padding: 14, marginBottom: 20,
-            }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 13, color: C.g500 }}>Duration</Text>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: C.g700 }}>{days} day{days > 1 ? 's' : ''}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 13, color: C.g500 }}>Rate</Text>
-                <Text style={{ fontSize: 13, color: C.g700 }}>₱{parseFloat(vehicle.pricePerDay).toLocaleString()}/day</Text>
-              </View>
-              <View style={{ height: 1, backgroundColor: C.g200, marginVertical: 8 }} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: C.navy }}>Total</Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: C.primary }}>₱{total.toLocaleString()}</Text>
-              </View>
-            </View>
-          )}
-
-          <TouchableOpacity onPress={handleConfirm} style={s.btnPrimary}>
-            <Text style={s.btnPrimaryText}>Submit Rental Request</Text>
-          </TouchableOpacity>
-
-          <CalendarPicker
-            visible={calendarVisible}
-            initialDate={(calendarTarget === 'start' && startDate) ? parseYMD(startDate) : (calendarTarget === 'end' && endDate) ? parseYMD(endDate) : new Date()}
-            onClose={() => setCalendarVisible(false)}
-            onSelect={(d) => {
-              const ymd = formatYMD(d);
-              if (calendarTarget === 'start') setStart(ymd);
-              else if (calendarTarget === 'end') setEnd(ymd);
-              setCalendarVisible(false);
-            }}
-          />
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
-// ==================== MAIN COMPONENT ====================
 export default function RenterDashboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -532,6 +509,8 @@ export default function RenterDashboardScreen() {
   const { getApprovedVehicles, refreshVehicles } = useVehicles();
 
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('home');
+  const [savedVehicleIds, setSavedVehicleIds] = useState([]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -546,18 +525,15 @@ export default function RenterDashboardScreen() {
     }, [])
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!user) router.replace('/login');
   }, [user, router]);
 
-  const [activeTab, setActiveTab] = useState('home');
-  const [savedVehicleIds, setSavedVehicleIds] = useState([]);
   const userName = user?.firstName || user?.fullName || 'Renter';
   const myRentals = getBookingsForRenter(user?.email);
   const approvedVehicles = getApprovedVehicles();
 
-  // Load saved vehicles
-  React.useEffect(() => {
+  useEffect(() => {
     let mounted = true;
     (async () => {
       if (!user?.email) {
@@ -601,7 +577,6 @@ export default function RenterDashboardScreen() {
         return (
           <HomeTab
             vehicles={approvedVehicles}
-            bookings={myRentals}
             onCreateBooking={addBooking}
             user={user}
             savedVehicleIds={savedVehicleIds}
@@ -623,10 +598,17 @@ export default function RenterDashboardScreen() {
   if (!user) return null;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#edf1f7' }} edges={['top', 'bottom']}>
-      <DashboardHeader activeTab={activeTab} userName={userName} />
-      <View style={s.bodyWrap}>
-        <View style={s.contentShell}>{renderContent()}</View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerKicker}>RENTER PORTAL</Text>
+          <Text style={styles.headerTitle}>Renter Dashboard</Text>
+          <Text style={styles.headerSub}>Welcome back, {userName}</Text>
+        </View>
+        <View style={styles.avatarWrap}><ProfileAvatar size={40} /></View>
+      </View>
+      <View style={styles.bodyWrap}>
+        <View style={styles.contentShell}>{renderContent()}</View>
       </View>
       <BottomNav
         role="renter"
@@ -638,66 +620,81 @@ export default function RenterDashboardScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  // ... (all your existing styles remain unchanged)
+const styles = StyleSheet.create({
   header: {
-    backgroundColor: C.navy,
-    paddingTop: Platform.OS === 'ios' ? 56 : 34,
-    paddingBottom: 14,
-    paddingHorizontal: 20,
+    marginTop: Platform.OS === 'ios' ? 8 : 4,
+    marginHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: '#eef2f7',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
   },
-  headerKicker: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,.6)', letterSpacing: 1.1 },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: C.white },
-  headerSub: { fontSize: 13, color: 'rgba(255,255,255,.65)', marginTop: 2 },
-  bodyWrap: { flex: 1, marginTop: -4, backgroundColor: '#e7eef6' },
-  contentShell: { flex: 1, width: '100%', maxWidth: 430, alignSelf: 'center' },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 10, borderWidth: 1, borderColor: C.g200, paddingHorizontal: 12, marginBottom: 12 },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: C.g900 },
-  filterTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: C.white, borderWidth: 1, borderColor: C.g200 },
+  headerKicker: { fontSize: 10, fontWeight: '700', color: C.gray400, letterSpacing: 1.2 },
+  headerTitle:  { fontSize: 22, fontWeight: '800', color: C.navy, marginTop: 1 },
+  headerSub:    { fontSize: 13, color: C.gray500, marginTop: 2 },
+  avatarWrap: {
+    backgroundColor: '#f0f7f5',
+    borderRadius: 999,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#d7ece6',
+  },
+  bodyWrap: { flex: 1, backgroundColor: '#f5f7fa' },
+  contentShell: { flex: 1, width: '100%', maxWidth: 460, alignSelf: 'center' },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 10, borderWidth: 1, borderColor: C.gray200, paddingHorizontal: 12, marginBottom: 12 },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: C.gray900 },
+  filterTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: C.white, borderWidth: 1, borderColor: C.gray200 },
   filterTabActive: { backgroundColor: C.primary, borderColor: C.primary },
-  filterTabText: { fontSize: 13, color: C.g500 },
+  filterTabText: { fontSize: 13, color: C.gray500 },
   filterTabTextActive: { color: C.white, fontWeight: '700' },
-  vehicleCard: { backgroundColor: C.white, borderRadius: 18, marginBottom: 14, borderWidth: 1, borderColor: '#dfe7f3', elevation: 2, overflow: 'hidden' },
+  vehicleCard: { backgroundColor: C.white, borderRadius: 10, marginBottom: 14, borderWidth: 1, borderColor: '#eef2f7', shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: 'hidden' },
   vehicleImageWrap: { position: 'relative', backgroundColor: '#f3f6fb' },
-  vehicleImage: { width: '100%', height: 184, backgroundColor: '#f3f6fb' },
+  vehicleImage: { width: '100%', height: 190, backgroundColor: '#f3f6fb' },
   vehicleStatusPill: { position: 'absolute', top: 12, left: 12, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   vehicleStatusPillText: { fontSize: 12, fontWeight: '800' },
   vehicleBody: { padding: 14 },
   vehicleTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   yearPill: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#e5e7eb' },
-  yearPillText: { fontSize: 12, color: C.g500, fontWeight: '700' },
+  yearPillText: { fontSize: 12, color: C.gray500, fontWeight: '700' },
   vehicleChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   vehicleInfoChip: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
-  vehicleInfoChipText: { fontSize: 11, color: C.g700, fontWeight: '600' },
-  vehicleLocation: { fontSize: 13, color: C.g500, marginTop: 12 },
+  vehicleInfoChipText: { fontSize: 11, color: C.gray700, fontWeight: '600' },
+  vehicleLocation: { fontSize: 13, color: C.gray500, marginTop: 12 },
   vehicleDivider: { height: 1, backgroundColor: '#e5e7eb', marginTop: 14, marginBottom: 12 },
   vehicleFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  vehicleThumbFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.g200 },
-  vehicleThumbFallbackText: { fontSize: 10, color: C.g400, fontWeight: '600' },
-  vehicleName: { fontSize: 19, fontWeight: '800', color: C.navy, flex: 1 },
+  vehicleThumbFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.gray200 },
+  vehicleThumbFallbackText: { fontSize: 20, color: C.gray400, fontWeight: '600' },
+  vehicleName: { fontSize: 22, fontWeight: '800', color: C.navy, flex: 1 },
   vehiclePrice: { fontSize: 20, color: C.primary, fontWeight: '800' },
-  vehiclePricePer: { fontSize: 12, color: C.primaryDk, fontWeight: '700' },
-  saveBtn: { backgroundColor: C.white, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.g200 },
-  saveBtnActive: { backgroundColor: C.primaryLt, borderColor: C.primary },
-  saveBtnText: { color: C.g600, fontSize: 13, fontWeight: '700' },
-  saveBtnTextActive: { color: C.primaryDk },
+  vehiclePricePer: { fontSize: 12, color: C.primaryLight, fontWeight: '700' },
+  saveBtn: { backgroundColor: C.white, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.gray200 },
+  saveBtnActive: { backgroundColor: C.primaryLighter, borderColor: C.primary },
+  saveBtnText: { color: C.gray600, fontSize: 13, fontWeight: '700' },
+  saveBtnTextActive: { color: C.primaryLight },
   rentBtn: { backgroundColor: C.primary, borderRadius: 11, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  rentBtnDisabled: { backgroundColor: C.g100 },
+  rentBtnDisabled: { backgroundColor: C.gray100 },
   rentBtnText: { color: C.white, fontSize: 13, fontWeight: '800' },
-  empty: { alignItems: 'center', padding: 48, backgroundColor: C.g50, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: C.g200 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: C.g700, marginBottom: 6 },
-  emptySub: { fontSize: 13, color: C.g400, textAlign: 'center' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: C.g200 },
+  empty: { alignItems: 'center', padding: 48, backgroundColor: C.gray50, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: C.gray200 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: C.gray700, marginBottom: 6 },
+  emptySub: { fontSize: 13, color: C.gray400, textAlign: 'center' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: C.gray200 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: C.navy },
-  modalClose: { fontSize: 22, color: C.g400 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.g400, marginBottom: 6 },
-  input: { padding: 12, borderWidth: 1.5, borderColor: C.g200, borderRadius: 10, fontSize: 14, color: C.g900, backgroundColor: C.white },
-  dateRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 10, borderWidth: 1, borderColor: C.g200, paddingHorizontal: 10 },
+  modalClose: { fontSize: 22, color: C.gray400 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.gray400, marginBottom: 6 },
+  input: { padding: 12, borderWidth: 1.5, borderColor: C.gray200, borderRadius: 10, fontSize: 14, color: C.gray900, backgroundColor: C.white },
+  dateRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 10, borderWidth: 1, borderColor: C.gray200, paddingHorizontal: 10 },
   dateIcon: { fontSize: 18, marginRight: 8 },
-  dateInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: C.g900, paddingLeft: 0 },
+  dateInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: C.gray900, paddingLeft: 0 },
   btnPrimary: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', elevation: 3 },
   btnPrimaryText: { color: C.white, fontSize: 14, fontWeight: '700' },
 });

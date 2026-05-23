@@ -9,6 +9,48 @@ import { apiRequest } from '../services/api';
 const FeedbackContext = createContext(null);
 const FEEDBACK_KEY = 'carRental.feedback.v1';
 
+const toStringValue = (value) => (value === null || value === undefined ? '' : String(value));
+
+const normalizeFeedbackRecord = (feedbackItem) => {
+  const bookingData = feedbackItem?.booking ?? feedbackItem?.rental ?? feedbackItem?.booking_data ?? null;
+  const fromData = feedbackItem?.fromUser ?? feedbackItem?.from_user ?? feedbackItem?.author ?? null;
+  const toData = feedbackItem?.toUser ?? feedbackItem?.to_user ?? feedbackItem?.recipient ?? null;
+
+  return {
+    ...feedbackItem,
+    id: feedbackItem?.id ?? feedbackItem?.pk ?? `fb_${Date.now()}`,
+    bookingId: feedbackItem?.bookingId ?? feedbackItem?.booking_id ?? feedbackItem?.rentalId ?? feedbackItem?.rental_id ?? (bookingData && typeof bookingData === 'object' ? bookingData.id ?? bookingData.pk : bookingData) ?? null,
+    vehicleId: feedbackItem?.vehicleId ?? feedbackItem?.vehicle_id ?? feedbackItem?.carId ?? feedbackItem?.car_id ?? null,
+    vehicleName: feedbackItem?.vehicleName ?? feedbackItem?.vehicle_name ?? feedbackItem?.carName ?? feedbackItem?.car_name ?? null,
+    fromUserId: feedbackItem?.fromUserId ?? feedbackItem?.from_user_id ?? (fromData && typeof fromData === 'object' ? fromData.id ?? fromData.pk : fromData) ?? null,
+    fromUserEmail: feedbackItem?.fromUserEmail ?? feedbackItem?.from_user_email ?? (fromData && typeof fromData === 'object' ? fromData.email : null) ?? null,
+    fromUserRole: feedbackItem?.fromUserRole ?? feedbackItem?.from_user_role ?? null,
+    toUserId: feedbackItem?.toUserId ?? feedbackItem?.to_user_id ?? (toData && typeof toData === 'object' ? toData.id ?? toData.pk : toData) ?? null,
+    toUserEmail: feedbackItem?.toUserEmail ?? feedbackItem?.to_user_email ?? (toData && typeof toData === 'object' ? toData.email : null) ?? null,
+    toUserRole: feedbackItem?.toUserRole ?? feedbackItem?.to_user_role ?? null,
+    rating: Number(feedbackItem?.rating ?? 5),
+    message: feedbackItem?.message ?? feedbackItem?.comment ?? '',
+    type: feedbackItem?.type ?? 'general',
+    createdAt: feedbackItem?.createdAt ?? feedbackItem?.created_at ?? new Date().toISOString(),
+  };
+};
+
+const isOwnerMatch = (item, ownerIdOrEmail) => {
+  const target = toStringValue(ownerIdOrEmail).trim().toLowerCase();
+  if (!target) return false;
+  const ownerId = toStringValue(item?.toUserId).trim().toLowerCase();
+  const ownerEmail = toStringValue(item?.toUserEmail).trim().toLowerCase();
+  return ownerId === target || ownerEmail === target;
+};
+
+const isRenterMatch = (item, renterIdOrEmail) => {
+  const target = toStringValue(renterIdOrEmail).trim().toLowerCase();
+  if (!target) return false;
+  const renterId = toStringValue(item?.fromUserId).trim().toLowerCase();
+  const renterEmail = toStringValue(item?.fromUserEmail).trim().toLowerCase();
+  return renterId === target || renterEmail === target;
+};
+
 export function FeedbackProvider({ children }) {
   const [feedback, setFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,46 +66,10 @@ export function FeedbackProvider({ children }) {
         setFeedback(localFeedback);
       }
 
-      // 2) Try fetching from backend (multiple possible endpoints)
-      const endpoints = ['/api/feedback/', '/api/reviews/', '/api/ratings/'];
-      let remote = null;
-      for (const ep of endpoints) {
-        try {
-          const data = await apiRequest(ep, { method: 'GET' });
-          if (Array.isArray(data)) { remote = data; break; }
-        } catch (e) {
-          // try next
-        }
-      }
-
       if (!mounted) return;
-      if (Array.isArray(remote)) {
-        // Normalize remote items
-        const normalized = remote.map((f) => ({
-          id: f.id ?? f.pk ?? `fb_${Date.now()}`,
-          bookingId: f.bookingId ?? f.booking_id ?? f.rental ?? f.rentalId ?? null,
-          fromUserId: f.fromUserId ?? f.from_user_id ?? f.from_user ?? null,
-          fromUserEmail: f.fromUserEmail ?? f.from_user_email ?? null,
-          fromUserRole: f.fromUserRole ?? f.from_user_role ?? null,
-          toUserId: f.toUserId ?? f.to_user_id ?? f.to_user ?? null,
-          toUserEmail: f.toUserEmail ?? f.to_user_email ?? null,
-          toUserRole: f.toUserRole ?? f.to_user_role ?? null,
-          rating: f.rating ?? 5,
-          message: f.message ?? f.comment ?? '',
-          type: f.type ?? 'general', // 'general', 'complaint', 'praise'
-          createdAt: f.createdAt ?? f.created_at ?? new Date().toISOString(),
-          ...f,
-        }));
-
-        // Merge remote and local (remote authoritative)
-        const byId = new Map();
-        normalized.forEach(r => byId.set(String(r.id), r));
-        (localFeedback || []).forEach(l => { if (!byId.has(String(l.id))) byId.set(String(l.id), l); });
-        const merged = Array.from(byId.values());
-        setFeedback(merged);
-        // persist merged cache
-        AsyncStorage.setItem(FEEDBACK_KEY, JSON.stringify(merged)).catch(() => {});
-      }
+      // Backend does not expose a feedback/reviews resource yet, so keep the
+      // mobile experience local-first and avoid noisy 404 calls.
+      setFeedback(Array.isArray(localFeedback) ? localFeedback.map(normalizeFeedbackRecord) : []);
     } catch (error) {
       console.warn('[FeedbackContext] Failed to load feedback', error);
     } finally {
@@ -96,45 +102,16 @@ export function FeedbackProvider({ children }) {
 
   // Add feedback/review
   const addFeedback = useCallback((feedbackData) => {
-    const local = {
+    const local = normalizeFeedbackRecord({
       ...feedbackData,
       id: feedbackData.id || `fb_${Date.now()}`,
       createdAt: feedbackData.createdAt || new Date().toISOString(),
-    };
+    });
 
     // optimistic local add
     mutate((prev) => [...prev, local]);
 
-    // Try to persist remotely
-    (async () => {
-      const endpoints = ['/api/feedback/', '/api/reviews/', '/api/ratings/'];
-      for (const ep of endpoints) {
-        try {
-          const created = await apiRequest(ep, { method: 'POST', body: feedbackData });
-          if (created) {
-            const normalized = {
-              id: created.id ?? created.pk ?? local.id,
-              bookingId: created.bookingId ?? created.booking_id ?? local.bookingId,
-              fromUserId: created.fromUserId ?? created.from_user_id ?? local.fromUserId,
-              fromUserEmail: created.fromUserEmail ?? created.from_user_email ?? local.fromUserEmail,
-              fromUserRole: created.fromUserRole ?? created.from_user_role ?? local.fromUserRole,
-              toUserId: created.toUserId ?? created.to_user_id ?? local.toUserId,
-              toUserEmail: created.toUserEmail ?? created.to_user_email ?? local.toUserEmail,
-              toUserRole: created.toUserRole ?? created.to_user_role ?? local.toUserRole,
-              rating: created.rating ?? local.rating ?? 5,
-              message: created.message ?? local.message ?? '',
-              type: created.type ?? local.type ?? 'general',
-              createdAt: created.createdAt ?? created.created_at ?? local.createdAt,
-              ...created,
-            };
-            mutate(prev => prev.map(f => (String(f.id) === String(local.id) ? normalized : f)));
-          }
-          break;
-        } catch (e) {
-          // try next
-        }
-      }
-    })();
+    // No backend feedback endpoint is currently available. Keep changes local.
 
     return local;
   }, [mutate]);
@@ -143,6 +120,16 @@ export function FeedbackProvider({ children }) {
   const getFeedbackForBooking = useCallback((bookingId) => {
     if (!bookingId) return [];
     return feedback.filter(f => f.bookingId === bookingId || String(f.bookingId) === String(bookingId));
+  }, [feedback]);
+
+  const getFeedbackForOwner = useCallback((ownerIdOrEmail) => {
+    if (!ownerIdOrEmail) return [];
+    return feedback.filter((item) => isOwnerMatch(item, ownerIdOrEmail));
+  }, [feedback]);
+
+  const getFeedbackForRenter = useCallback((renterIdOrEmail) => {
+    if (!renterIdOrEmail) return [];
+    return feedback.filter((item) => isRenterMatch(item, renterIdOrEmail));
   }, [feedback]);
 
   // Get feedback sent by a user
@@ -174,8 +161,8 @@ export function FeedbackProvider({ children }) {
       ...booking,
       feedback: feedback.filter(f => f.bookingId === booking.id || String(f.bookingId) === String(booking.id)),
       averageRating: feedback
-        .filter(f => f.bookingId === booking.id)
-        .reduce((sum, f) => sum + (f.rating || 0), 0) / Math.max(feedback.filter(f => f.bookingId === booking.id).length, 1) || 0,
+        .filter(f => f.bookingId === booking.id || String(f.bookingId) === String(booking.id))
+        .reduce((sum, f) => sum + (f.rating || 0), 0) / Math.max(feedback.filter(f => f.bookingId === booking.id || String(f.bookingId) === String(booking.id)).length, 1) || 0,
     }));
   }, [feedback]);
 
@@ -185,36 +172,14 @@ export function FeedbackProvider({ children }) {
       prev.map((item) => (item.id === feedbackId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
     );
 
-    // attempt to patch on server
-    (async () => {
-      const endpoints = [`/api/feedback/${feedbackId}/`, `/api/reviews/${feedbackId}/`, `/api/ratings/${feedbackId}/`];
-      for (const ep of endpoints) {
-        try {
-          await apiRequest(ep, { method: 'PATCH', body: updates });
-          break;
-        } catch (e) {
-          // try next
-        }
-      }
-    })();
+    // No backend feedback endpoint is currently available. Keep changes local.
   }, [mutate]);
 
   // Delete feedback
   const deleteFeedback = useCallback((feedbackId) => {
     mutate((prev) => prev.filter((item) => item.id !== feedbackId));
 
-    // attempt to delete on server
-    (async () => {
-      const endpoints = [`/api/feedback/${feedbackId}/`, `/api/reviews/${feedbackId}/`, `/api/ratings/${feedbackId}/`];
-      for (const ep of endpoints) {
-        try {
-          await apiRequest(ep, { method: 'DELETE' });
-          break;
-        } catch (e) {
-          // try next
-        }
-      }
-    })();
+    // No backend feedback endpoint is currently available. Keep changes local.
   }, [mutate]);
 
   const clearFeedback = useCallback(() => persist([]), [persist]);
@@ -228,6 +193,8 @@ export function FeedbackProvider({ children }) {
         updateFeedback,
         deleteFeedback,
         getFeedbackForBooking,
+        getFeedbackForOwner,
+        getFeedbackForRenter,
         getFeedbackFromUser,
         getFeedbackForUser,
         getRentalHistoryWithFeedback,

@@ -49,6 +49,28 @@ const IcBook = ({ s = 14, c = C.white }) => (
   </Svg>
 );
 
+const IcVehicleTab = ({ s = 14, c = C.g500 }) => (
+  <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3.5l2-3h7l2 3H21a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2" />
+    <Circle cx="8" cy="17" r="2" />
+    <Circle cx="17" cy="17" r="2" />
+  </Svg>
+);
+
+const IcHistoryTab = ({ s = 14, c = C.g500 }) => (
+  <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M13 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9z" />
+    <Path d="M13 2v7h7" />
+  </Svg>
+);
+
+const IcLogTab = ({ s = 14, c = C.g500 }) => (
+  <Svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+    <Path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" />
+  </Svg>
+);
+
 /* ── Vehicle Card ── */
 function VehicleCard({ vehicle, onEdit, onDelete }) {
   const statusColors = {
@@ -817,9 +839,15 @@ export default function OwnerDashboardScreen() {
 
   if (!user) return null;
 
+  const TOP_TABS = [
+    { key: 'home', label: 'Vehicles', Icon: IcVehicleTab },
+    { key: 'rentals', label: 'History', Icon: IcHistoryTab },
+    { key: 'logreport', label: 'Log Report', Icon: IcLogTab },
+  ];
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#e7eef6' }} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
       <View style={s.header}>
         <View style={{ flex: 1 }}>
           <Text style={s.headerKicker}>OWNER PORTAL</Text>
@@ -830,6 +858,26 @@ export default function OwnerDashboardScreen() {
           <ProfileAvatar size={40} />
         </View>
       </View>
+
+      <View style={s.topTabsWrap}>
+        {TOP_TABS.map(({ key, label, Icon }) => {
+          const active = activeTab === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[s.topTab, active && s.topTabActive]}
+              onPress={() => setActiveTab(key)}
+            >
+              <Icon c={active ? C.white : C.g500} />
+              <Text style={[s.topTabText, active && s.topTabTextActive]}>{label}</Text>
+              {key === 'rentals' && pendingCount > 0 ? (
+                <View style={s.topTabBadge}><Text style={s.topTabBadgeText}>{pendingCount}</Text></View>
+              ) : null}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <View style={s.bodyWrap}>
         <View style={s.contentShell}>{renderContent()}</View>
       </View>
@@ -841,27 +889,105 @@ export default function OwnerDashboardScreen() {
 }
 
 const s = StyleSheet.create({
-  header:       { backgroundColor: C.navy, paddingTop: Platform.OS === 'ios' ? 44 : 28, paddingBottom: 12, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  headerKicker: { fontSize: 9, fontWeight: '700', color: 'rgba(255,255,255,.6)', letterSpacing: 1.1 },
-  headerTitle:  { fontSize: 20, fontWeight: '800', color: C.white, marginTop: 2 },
-  headerSub:    { fontSize: 12, color: 'rgba(255,255,255,.78)', marginTop: 2 },
-  avatarWrap:   { backgroundColor: 'rgba(255,255,255,.12)', borderRadius: 999, padding: 3, marginTop: 2 },
-  bodyWrap:     { flex: 1, marginTop: -4, backgroundColor: '#e7eef6' },
-  contentShell: { flex: 1, width: '100%', maxWidth: 430, alignSelf: 'center' },
-  statsRow:     { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 18, paddingBottom: 14, gap: 8 },
-  statCard:     { flex: 1, backgroundColor: C.white, borderRadius: 14, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#ebeff5', elevation: 1 },
-  statNum:      { fontSize: 20, fontWeight: '800' },
+  header: {
+    marginTop: Platform.OS === 'ios' ? 8 : 4,
+    marginHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: '#eef2f7',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerKicker: { fontSize: 10, fontWeight: '700', color: C.g400, letterSpacing: 1.2 },
+  headerTitle:  { fontSize: 22, fontWeight: '800', color: C.navy, marginTop: 1 },
+  headerSub:    { fontSize: 13, color: C.g500, marginTop: 2 },
+  avatarWrap: {
+    backgroundColor: '#f0f7f5',
+    borderRadius: 999,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#d7ece6',
+  },
+  topTabsWrap: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 },
+  topTab: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.g200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    position: 'relative',
+  },
+  topTabActive: { backgroundColor: C.primary, borderColor: C.primaryDk },
+  topTabText: { fontSize: 12, color: C.g500, fontWeight: '700' },
+  topTabTextActive: { color: C.white },
+  topTabBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 999,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.danger,
+  },
+  topTabBadgeText: { fontSize: 10, color: C.white, fontWeight: '800' },
+  bodyWrap:     { flex: 1, backgroundColor: '#f5f7fa' },
+  contentShell: { flex: 1, width: '100%', maxWidth: 460, alignSelf: 'center' },
+  statsRow:     { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, gap: 8 },
+  statCard: {
+    flex: 1,
+    backgroundColor: C.white,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#eff3f8',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  statNum:      { fontSize: 19, fontWeight: '800' },
   statLabel:    { fontSize: 11, color: C.g500, marginTop: 3 },
-  searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 12, borderWidth: 1, borderColor: '#dbe3ee', paddingHorizontal: 12, paddingVertical: 9, marginBottom: 14 },
+  searchWrap:   { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 10, borderWidth: 1, borderColor: C.g200, paddingHorizontal: 12, paddingVertical: 9, marginBottom: 14 },
   searchInput:  { flex: 1, fontSize: 14, color: C.g900 },
-  vehicleCard:  { backgroundColor: C.white, borderRadius: 18, marginBottom: 14, borderWidth: 1, borderColor: '#dfe7f3', elevation: 2, overflow: 'hidden' },
+  vehicleCard: {
+    backgroundColor: C.white,
+    borderRadius: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#eef2f7',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    overflow: 'hidden',
+  },
   vehicleImageWrap: { position: 'relative', backgroundColor: '#f3f6fb' },
   vehicleImage: { width: '100%', height: 190, backgroundColor: '#f3f6fb' },
   vehicleStatusPill: { position: 'absolute', top: 12, left: 12, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   vehicleStatusPillText: { fontSize: 12, fontWeight: '800' },
   vehicleBody: { padding: 14 },
   vehicleTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  yearPill: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#e5e7eb' },
+  yearPill: { backgroundColor: '#f9fafb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#e5e7eb' },
   yearPillText: { fontSize: 12, color: C.g500, fontWeight: '700' },
   vehicleChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   vehicleInfoChip: { backgroundColor: '#f3f4f6', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 },
@@ -885,12 +1011,37 @@ const s = StyleSheet.create({
   approvalBadge:{ alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 8 },
   approvalText: { fontSize: 11, fontWeight: '700' },
   iconBtn:      { width: 36, height: 36, borderRadius: 10, backgroundColor: '#f7f9fc', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#dbe3ee' },
-  rentalCard:   { backgroundColor: C.white, borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#dfe7f3', elevation: 2 },
-  filterTab:    { flex: 1, height: 36, paddingHorizontal: 8, borderRadius: 10, backgroundColor: C.white, borderWidth: 1, borderColor: '#dfe7f3', alignItems: 'center', justifyContent: 'center' },
+  rentalCard: {
+    backgroundColor: C.white,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#eef2f7',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  filterTab:    { flex: 1, height: 36, paddingHorizontal: 8, borderRadius: 8, backgroundColor: C.white, borderWidth: 1, borderColor: C.g200, alignItems: 'center', justifyContent: 'center' },
   filterTabActive:     { backgroundColor: C.primary, borderColor: C.primary },
   filterTabText:       { fontSize: 12, color: C.g500 },
   filterTabTextActive: { color: C.white, fontWeight: '700' },
-  filterPanel: { marginHorizontal: 16, marginBottom: 14, backgroundColor: C.white, borderRadius: 12, borderWidth: 1, borderColor: '#dbe3ee', padding: 12 },
+  filterPanel: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    backgroundColor: C.white,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#eef2f7',
+    padding: 12,
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
   filterPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   filterPanelTitle: { fontSize: 13, fontWeight: '700', color: C.g700 },
   clearFilterText: { fontSize: 12, fontWeight: '700', color: C.primary },
@@ -910,7 +1061,7 @@ const s = StyleSheet.create({
   modalTitle:   { fontSize: 18, fontWeight: '700', color: C.navy },
   modalClose:   { fontSize: 22, color: C.g400 },
   fieldLabel:   { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: C.g400, marginBottom: 6 },
-  input:        { padding: 12, borderWidth: 1.5, borderColor: '#dbe3ee', borderRadius: 11, fontSize: 14, color: C.g900, backgroundColor: C.white },
+  input:        { padding: 12, borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 10, fontSize: 14, color: C.g900, backgroundColor: C.white },
   gridRow:      { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   halfWrap:     { width: '48%', marginBottom: 14 },
   fullWrap:     { width: '100%', marginBottom: 14 },

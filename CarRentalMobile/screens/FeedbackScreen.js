@@ -1,6 +1,5 @@
 // screens/FeedbackScreen.js
-// Feedback & Reviews - exchange feedback between owner and renter
-// Shows rental history with associated feedback and ratings
+// Enhanced Feedback & Reviews - exchange feedback between owner and renter
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -13,36 +12,77 @@ import {
   Alert,
   Modal,
   RefreshControl,
+  Platform,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { useBookings } from '../context/BookingContext';
 import { useFeedback } from '../context/FeedbackContext';
+import ProfileAvatar from '../components/ProfileAvatar';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const C = {
-  primary: '#3F9B84',
-  primaryDk: '#2d7a67',
-  primaryLt: '#ecfdf5',
-  navy: '#1a2c5e',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  success: '#22c55e',
-  g50: '#f9fafb',
-  g100: '#f3f4f6',
-  g200: '#e5e7eb',
-  g300: '#d1d5db',
-  g400: '#9ca3af',
-  g500: '#6b7280',
-  g700: '#374151',
-  g900: '#111827',
-  white: '#ffffff',
+  primary: '#2D6A4F',
+  primaryLight: '#40916C',
+  primaryLighter: '#D8F3DC',
+  primaryBg: '#F0F9F4',
+  navy: '#1B2E35',
+  danger: '#E63946',
+  warning: '#F4A261',
+  success: '#2A9D8F',
+  info: '#4A9FF5',
+  white: '#FFFFFF',
+  black: '#0A0A0A',
+  gray50: '#F8F9FA',
+  gray100: '#F1F3F5',
+  gray200: '#E9ECEF',
+  gray300: '#DEE2E6',
+  gray400: '#CED4DA',
+  gray500: '#ADB5BD',
+  gray600: '#6C757D',
+  gray700: '#495057',
+  gray800: '#343A40',
+  gray900: '#212529',
+};
+
+const formatDate = (dateStr, format = 'short') => {
+  const date = new Date(dateStr);
+  if (format === 'short') {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const getDaysBetween = (start, end) => {
+  return Math.max(0, Math.round((new Date(end) - new Date(start)) / 86400000));
+};
+
+const StarRating = ({ rating, size = 16, onPress }) => {
+  const stars = [1, 2, 3, 4, 5];
+  return (
+    <View style={styles.starRatingContainer}>
+      {stars.map((star) => (
+        <TouchableOpacity
+          key={star}
+          onPress={() => onPress?.(star)}
+          disabled={!onPress}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.starIcon, { fontSize: size }, rating >= star && styles.starActive]}>
+            ★
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 };
 
 function RentalHistoryCard({ booking, feedback = [], userRole, onLeaveFeedback }) {
-  const days = Math.max(0, Math.round((new Date(booking.endDate) - new Date(booking.startDate)) / 86400000));
-  const dailyRate = days > 0 ? Math.round(booking.totalPrice / days) : 0;
-
+  const days = getDaysBetween(booking.startDate, booking.endDate);
   const otherParty = userRole === 'renter'
     ? { name: booking.ownerName, email: booking.ownerEmail }
     : { name: booking.renterName, email: booking.renterEmail };
@@ -50,77 +90,93 @@ function RentalHistoryCard({ booking, feedback = [], userRole, onLeaveFeedback }
   const hasFeedback = feedback.length > 0;
   const avgRating = hasFeedback 
     ? (feedback.reduce((sum, f) => sum + (f.rating || 0), 0) / feedback.length).toFixed(1)
-    : 'N/A';
+    : null;
 
-  const badgeColors = {
-    pending: { bg: '#fef3c7', text: '#92400e' },
-    approved: { bg: '#d1fae5', text: '#065f46' },
-    completed: { bg: '#dbeafe', text: '#1e40af' },
-    rejected: { bg: '#fee2e2', text: '#991b1b' },
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'completed':
+        return { bg: C.primaryLighter, text: C.primary };
+      case 'approved':
+        return { bg: '#E3FCF2', text: C.success };
+      case 'pending':
+        return { bg: '#FFF3E0', text: C.warning };
+      default:
+        return { bg: C.gray100, text: C.gray600 };
+    }
   };
-
-  const badge = badgeColors[booking.status] || badgeColors.pending;
+  const statusStyle = getStatusStyle(booking.status);
 
   return (
-    <View style={s.rentalCard}>
-      {/* Header */}
-      <View style={s.rentalHeader}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.vehicleName}>{booking.vehicleName}</Text>
-          <Text style={s.modelInfo}>{booking.vehicleModel} • {booking.year || ''}</Text>
-          <Text style={s.partyName}>
-            {userRole === 'renter' ? '👤 Owner: ' : '👤 Renter: '}
-            {otherParty.name || 'N/A'}
-          </Text>
+    <View style={styles.rentalCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.vehicleInfo}>
+          <Text style={styles.vehicleName}>{booking.vehicleName}</Text>
+          <Text style={styles.vehicleMeta}>{booking.vehicleModel} • {booking.year || '2024'}</Text>
         </View>
-        <View style={[s.badgeContainer, { backgroundColor: badge.bg }]}>
-          <Text style={[s.badgeText, { color: badge.text }]}>
-            {booking.status === 'pending' ? 'Pending' : booking.status === 'approved' ? 'Active' : booking.status === 'completed' ? 'Done' : 'Rejected'}
+        <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+          <Text style={[styles.statusText, { color: statusStyle.text }]}>
+            {booking.status === 'completed' ? 'Completed' : booking.status === 'approved' ? 'Active' : booking.status === 'pending' ? 'Pending' : 'Rejected'}
           </Text>
         </View>
       </View>
 
-      {/* Date & Price */}
-      <View style={s.datePrice}>
-        <Text style={s.dateText}>
-          📅 {new Date(booking.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          {' → '}
-          {new Date(booking.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </Text>
-        <Text style={s.priceText}>₱{booking.totalPrice.toLocaleString()} ({days}d)</Text>
+      <View style={styles.detailsSection}>
+        <View style={styles.participantRow}>
+          <Text style={styles.participantLabel}>{userRole === 'renter' ? 'Owner' : 'Renter'}</Text>
+          <Text style={styles.participantName}>{otherParty.name || 'N/A'}</Text>
+        </View>
+        <View style={styles.datePriceRow}>
+          <View style={styles.dateChip}>
+            <Text style={styles.dateText}>
+              {formatDate(booking.startDate)} → {formatDate(booking.endDate)}
+            </Text>
+            <Text style={styles.durationText}> • {days} {days === 1 ? 'day' : 'days'}</Text>
+          </View>
+          <Text style={styles.priceText}>₱{booking.totalPrice.toLocaleString()}</Text>
+        </View>
       </View>
 
-      {/* Feedback Section */}
-      <View style={s.feedbackSection}>
-        <Text style={s.feedbackLabel}>Reviews & Feedback</Text>
-        
+      <View style={styles.feedbackSection}>
+        <View style={styles.feedbackHeaderRow}>
+          <Text style={styles.feedbackTitle}>Reviews & Feedback</Text>
+          {hasFeedback && avgRating && (
+            <View style={styles.ratingChip}>
+              <StarRating rating={parseInt(avgRating)} size={12} />
+              <Text style={styles.ratingValue}>{avgRating}</Text>
+            </View>
+          )}
+        </View>
+
         {hasFeedback ? (
-          <View style={s.feedbackList}>
-            {feedback.map((fb) => (
-              <View key={fb.id} style={s.feedbackItem}>
-                <View style={s.feedbackHeader}>
-                  <Text style={s.feedbackFrom}>
-                    {fb.fromUserRole === 'owner' ? '🏢 Owner' : '👤 Renter'}
+          <View style={styles.feedbackList}>
+            {feedback.map((fb, idx) => (
+              <View key={fb.id || idx} style={styles.feedbackItem}>
+                <View style={styles.feedbackItemHeader}>
+                  <Text style={styles.feedbackAuthor}>
+                    {fb.fromUserRole === 'owner' ? 'Owner' : 'Renter'}
                   </Text>
-                  <Text style={s.feedbackRating}>{'⭐'.repeat(Math.round(fb.rating || 0))}</Text>
+                  <StarRating rating={fb.rating || 0} size={12} />
+                  <Text style={styles.feedbackDate}>
+                    {formatDate(fb.createdAt, 'full')}
+                  </Text>
                 </View>
-                <Text style={s.feedbackMessage}>{fb.message}</Text>
-                <Text style={s.feedbackDate}>
-                  {new Date(fb.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </Text>
+                <Text style={styles.feedbackMessage}>{fb.message}</Text>
               </View>
             ))}
           </View>
         ) : (
-          <Text style={s.noFeedback}>No feedback yet</Text>
+          <View style={styles.noFeedbackContainer}>
+            <Text style={styles.noFeedbackText}>No feedback yet</Text>
+            <Text style={styles.noFeedbackSubtext}>Be the first to share your experience</Text>
+          </View>
         )}
 
         {booking.status === 'completed' && (
           <TouchableOpacity 
-            style={s.btnAddFeedback}
+            style={styles.addFeedbackBtn}
             onPress={() => onLeaveFeedback(booking)}
           >
-            <Text style={s.btnAddFeedbackText}>+ Leave Feedback</Text>
+            <Text style={styles.addFeedbackBtnText}>Write a Review</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -135,7 +191,7 @@ function FeedbackModal({ visible, booking, userRole, userEmail, onSubmit, onClos
 
   const handleSubmit = () => {
     if (!message.trim()) {
-      Alert.alert('Error', 'Please enter a message');
+      Alert.alert('Missing Info', 'Please share your feedback message.');
       return;
     }
 
@@ -154,7 +210,7 @@ function FeedbackModal({ visible, booking, userRole, userEmail, onSubmit, onClos
     setRating(5);
     setFeedbackType('general');
     onClose();
-    Alert.alert('Success', 'Feedback submitted successfully!');
+    Alert.alert('Thank You', 'Your feedback has been submitted successfully.');
   };
 
   return (
@@ -164,81 +220,92 @@ function FeedbackModal({ visible, booking, userRole, userEmail, onSubmit, onClos
       transparent={true}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={s.modalContainer}>
-        <View style={s.modalHeader}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={s.btnClose}>✕ Close</Text>
-          </TouchableOpacity>
-          <Text style={s.modalTitle}>Leave Feedback</Text>
-          <View style={{ width: 60 }} />
-        </View>
+      <View style={styles.modalOverlay}>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Share Your Experience</Text>
+            <View style={{ width: 60 }} />
+          </View>
 
-        <ScrollView style={s.modalContent} showsVerticalScrollIndicator={false}>
-          {booking && (
-            <>
-              <Text style={s.modalLabel}>For:</Text>
-              <View style={s.bookingInfo}>
-                <Text style={s.infoText}>{booking.vehicleName}</Text>
-                <Text style={s.infoSubtext}>
-                  {new Date(booking.startDate).toLocaleDateString()} - {new Date(booking.endDate).toLocaleDateString()}
-                </Text>
-              </View>
+          <ScrollView 
+            style={styles.modalContent}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
+          >
+            {booking && (
+              <>
+                <View style={styles.modalBookingCard}>
+                  <Text style={styles.modalVehicleName}>{booking.vehicleName}</Text>
+                  <Text style={styles.modalDateRange}>
+                    {formatDate(booking.startDate, 'full')} → {formatDate(booking.endDate, 'full')}
+                  </Text>
+                </View>
 
-              {/* Rating */}
-              <Text style={s.modalLabel}>Rating</Text>
-              <View style={s.ratingContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <TouchableOpacity
-                    key={star}
-                    onPress={() => setRating(star)}
-                    style={s.starButton}
-                  >
-                    <Text style={[s.star, rating >= star && s.starActive]}>⭐</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionLabel}>Your Rating</Text>
+                  <StarRating rating={rating} size={32} onPress={setRating} />
+                  <Text style={styles.ratingHint}>
+                    {rating === 5 ? 'Excellent' : rating === 4 ? 'Good' : rating === 3 ? 'Average' : rating <= 2 ? 'Needs improvement' : ''}
+                  </Text>
+                </View>
 
-              {/* Feedback Type */}
-              <Text style={s.modalLabel}>Feedback Type</Text>
-              <View style={s.typeContainer}>
-                {['general', 'praise', 'complaint'].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[s.typeButton, feedbackType === type && s.typeButtonActive]}
-                    onPress={() => setFeedbackType(type)}
-                  >
-                    <Text style={[s.typeButtonText, feedbackType === type && s.typeButtonTextActive]}>
-                      {type === 'general' ? '💬 General' : type === 'praise' ? '👍 Praise' : '⚠️ Complaint'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionLabel}>Feedback Type</Text>
+                  <View style={styles.typeSelector}>
+                    {[
+                      { key: 'general', label: 'General' },
+                      { key: 'praise', label: 'Praise' },
+                      { key: 'complaint', label: 'Complaint' },
+                    ].map((type) => (
+                      <TouchableOpacity
+                        key={type.key}
+                        style={[
+                          styles.typeOption,
+                          feedbackType === type.key && styles.typeOptionActive,
+                        ]}
+                        onPress={() => setFeedbackType(type.key)}
+                      >
+                        <Text style={[
+                          styles.typeOptionText,
+                          feedbackType === type.key && styles.typeOptionTextActive,
+                        ]}>
+                          {type.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
 
-              {/* Message */}
-              <Text style={s.modalLabel}>Your Feedback</Text>
-              <TextInput
-                style={s.messageInput}
-                placeholder="Share your experience..."
-                placeholderTextColor={C.g400}
-                multiline={true}
-                numberOfLines={5}
-                value={message}
-                onChangeText={setMessage}
-              />
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionLabel}>Your Message</Text>
+                  <TextInput
+                    style={styles.messageInput}
+                    placeholder="What was your experience like?"
+                    placeholderTextColor={C.gray500}
+                    multiline={true}
+                    numberOfLines={5}
+                    value={message}
+                    onChangeText={setMessage}
+                  />
+                </View>
 
-              {/* Submit Button */}
-              <TouchableOpacity style={s.btnSubmitFeedback} onPress={handleSubmit}>
-                <Text style={s.btnSubmitFeedbackText}>📤 Submit Feedback</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+                <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+                  <Text style={styles.submitBtnText}>Submit Feedback</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </View>
     </Modal>
   );
 }
 
 export default function FeedbackScreen() {
+  const router = useRouter();
   const { user } = useAuth();
   const { bookings, refreshBookings } = useBookings();
   const { addFeedback, refreshFeedback, getRentalHistoryWithFeedback } = useFeedback();
@@ -246,6 +313,7 @@ export default function FeedbackScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [activeFilter, setActiveFilter] = useState('all');
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -263,6 +331,14 @@ export default function FeedbackScreen() {
     );
   }, [user, bookings, getRentalHistoryWithFeedback]);
 
+  const filteredHistory = useMemo(() => {
+    if (activeFilter === 'all') return rentalHistory;
+    if (activeFilter === 'completed') return rentalHistory.filter((b) => b.status === 'completed');
+    if (activeFilter === 'with-feedback') return rentalHistory.filter((b) => (b.feedback || []).length > 0);
+    if (activeFilter === 'needs-feedback') return rentalHistory.filter((b) => b.status === 'completed' && (b.feedback || []).length === 0);
+    return rentalHistory;
+  }, [rentalHistory, activeFilter]);
+
   const stats = useMemo(() => ({
     total: rentalHistory.length,
     completed: rentalHistory.filter(b => b.status === 'completed').length,
@@ -278,42 +354,80 @@ export default function FeedbackScreen() {
     addFeedback(feedbackData);
   };
 
+  const filters = [
+    { key: 'all', label: 'All', count: stats.total },
+    { key: 'completed', label: 'Completed', count: stats.completed, color: C.success },
+    { key: 'with-feedback', label: 'With Reviews', count: stats.withFeedback, color: C.primary },
+    { key: 'needs-feedback', label: 'Need Review', count: stats.completed - stats.withFeedback, color: C.warning },
+  ];
+
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <Text style={s.headerTitle}>Feedback & Reviews</Text>
-        <Text style={s.headerSubtitle}>Your rental history and feedback</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      {/* Header with Back Button - No Background Color */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>Feedback & Reviews</Text>
+          <Text style={styles.headerSubtitle}>Share your experience and help others</Text>
+        </View>
+        <ProfileAvatar size={40} />
       </View>
 
       <ScrollView
-        style={s.content}
-        contentContainerStyle={s.scrollContent}
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[C.primary]} />}
       >
-        {/* Stats */}
-        <View style={s.statsRow}>
-          {[
-            { label: 'Total Rentals', value: stats.total, color: C.primary },
-            { label: 'Completed', value: stats.completed, color: C.success },
-            { label: 'With Feedback', value: stats.withFeedback, color: C.warning },
-          ].map((stat) => (
-            <View key={stat.label} style={[s.statCard, { borderLeftColor: stat.color }]}>
-              <Text style={[s.statValue, { color: stat.color }]}>{stat.value}</Text>
-              <Text style={s.statLabel}>{stat.label}</Text>
-            </View>
+        <View style={styles.heroSection}>
+          <Text style={styles.heroBadge}>VOICE YOUR EXPERIENCE</Text>
+          <Text style={styles.heroTitle}>Every trip tells a story</Text>
+          <Text style={styles.heroSubtitle}>
+            Your honest feedback helps owners improve and future renters make better choices.
+          </Text>
+        </View>
+
+        <View style={styles.statsGrid}>
+          {filters.map(stat => (
+            <TouchableOpacity 
+              key={stat.key}
+              style={[styles.statCard, activeFilter === stat.key && styles.statCardActive]}
+              onPress={() => setActiveFilter(stat.key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.statValue, { color: stat.color || C.gray700 }]}>{stat.count}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </TouchableOpacity>
           ))}
         </View>
 
-        {/* Rental History */}
-        {rentalHistory.length === 0 ? (
-          <View style={s.emptyState}>
-            <Text style={s.emptyIcon}>📭</Text>
-            <Text style={s.emptyTitle}>No rental history</Text>
-            <Text style={s.emptySubtitle}>Your completed rentals will appear here</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          {filters.map(filter => (
+            <TouchableOpacity
+              key={filter.key}
+              style={[styles.filterChip, activeFilter === filter.key && styles.filterChipActive]}
+              onPress={() => setActiveFilter(filter.key)}
+            >
+              <Text style={[styles.filterChipText, activeFilter === filter.key && styles.filterChipTextActive]}>
+                {filter.label} ({filter.count})
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {filteredHistory.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No rentals found</Text>
+            <Text style={styles.emptySubtitle}>
+              {activeFilter === 'needs-feedback' 
+                ? "You don't have any completed rentals waiting for feedback."
+                : "Your rental history will appear here."}
+            </Text>
           </View>
         ) : (
-          rentalHistory.map((booking) => (
+          filteredHistory.map((booking) => (
             <RentalHistoryCard
               key={booking.id}
               booking={booking}
@@ -325,7 +439,6 @@ export default function FeedbackScreen() {
         )}
       </ScrollView>
 
-      {/* Feedback Modal */}
       <FeedbackModal
         visible={modalVisible}
         booking={selectedBooking}
@@ -338,212 +451,384 @@ export default function FeedbackScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.gray50,
+  },
   container: {
     flex: 1,
-    backgroundColor: C.g50,
   },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+
+  // Header with Back Button - No Background Color
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: C.white,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: C.g200,
+    borderBottomColor: C.gray100,
+    marginBottom: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  backIcon: {
+    fontSize: 24,
+    color: C.gray600,
+    fontWeight: '400',
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: C.navy,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: C.g500,
+    color: C.gray600,
     marginTop: 2,
   },
-  content: {
-    flex: 1,
+
+  heroSection: {
+    marginBottom: 24,
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 24,
+  heroBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.primary,
+    letterSpacing: 1,
+    marginBottom: 8,
   },
-  statsRow: {
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: C.navy,
+    marginBottom: 6,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: C.gray600,
+    lineHeight: 20,
+  },
+
+  statsGrid: {
     flexDirection: 'row',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 12,
     marginBottom: 20,
   },
   statCard: {
     flex: 1,
+    minWidth: (SCREEN_WIDTH - 52) / 4 - 8,
     backgroundColor: C.white,
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.gray200,
+    shadowColor: C.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statCardActive: {
+    borderColor: C.primary,
+    backgroundColor: C.primaryLighter,
+    borderWidth: 1.5,
   },
   statValue: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
   },
   statLabel: {
-    fontSize: 11,
-    color: C.g500,
+    fontSize: 12,
+    color: C.gray600,
     marginTop: 4,
+    fontWeight: '500',
   },
+
+  filterScroll: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 30,
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.gray300,
+    marginRight: 12,
+  },
+  filterChipActive: {
+    backgroundColor: C.primary,
+    borderColor: C.primary,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.gray700,
+  },
+  filterChipTextActive: {
+    color: C.white,
+  },
+
   rentalCard: {
     backgroundColor: C.white,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    borderRadius: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: C.g200,
+    borderColor: C.gray100,
+    shadowColor: C.black,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+    overflow: 'hidden',
   },
-  rentalHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    padding: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  vehicleInfo: {
+    flex: 1,
   },
   vehicleName: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: C.navy,
   },
-  modelInfo: {
-    fontSize: 12,
-    color: C.g500,
+  vehicleMeta: {
+    fontSize: 13,
+    color: C.gray600,
     marginTop: 2,
   },
-  partyName: {
-    fontSize: 13,
-    color: C.g600,
-    marginTop: 6,
-    fontWeight: '500',
-  },
-  badgeContainer: {
-    paddingHorizontal: 10,
+  statusBadge: {
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 30,
   },
-  badgeText: {
-    fontSize: 11,
+  statusText: {
+    fontSize: 12,
     fontWeight: '600',
   },
-  datePrice: {
+  detailsSection: {
+    padding: 16,
+    paddingTop: 12,
+  },
+  participantRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  participantLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: C.gray600,
+    marginRight: 8,
+  },
+  participantName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.navy,
+  },
+  datePriceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: C.g200,
+    flexWrap: 'wrap',
+  },
+  dateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.gray100,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
   dateText: {
     fontSize: 12,
-    color: C.g600,
+    color: C.gray700,
+  },
+  durationText: {
+    fontSize: 12,
+    color: C.gray500,
+    marginLeft: 4,
   },
   priceText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: C.primary,
   },
+
   feedbackSection: {
-    marginTop: 8,
+    backgroundColor: C.gray50,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: C.gray100,
   },
-  feedbackLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.navy,
-    marginBottom: 8,
-  },
-  feedbackList: {
-    marginBottom: 10,
-  },
-  feedbackItem: {
-    backgroundColor: C.g50,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: C.primary,
-  },
-  feedbackHeader: {
+  feedbackHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 12,
   },
-  feedbackFrom: {
+  feedbackTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: C.navy,
+  },
+  ratingChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    gap: 4,
+  },
+  ratingValue: {
     fontSize: 12,
     fontWeight: '600',
     color: C.primary,
   },
-  feedbackRating: {
-    fontSize: 12,
+  feedbackList: {
+    gap: 12,
+    marginBottom: 12,
   },
-  feedbackMessage: {
+  feedbackItem: {
+    backgroundColor: C.white,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: C.gray200,
+  },
+  feedbackItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 8,
+    gap: 8,
+  },
+  feedbackAuthor: {
     fontSize: 12,
-    color: C.g700,
-    lineHeight: 16,
-    marginBottom: 6,
+    fontWeight: '600',
+    color: C.primary,
   },
   feedbackDate: {
     fontSize: 10,
-    color: C.g400,
+    color: C.gray500,
   },
-  noFeedback: {
-    fontSize: 12,
-    color: C.g400,
-    fontStyle: 'italic',
-    marginBottom: 10,
-  },
-  btnAddFeedback: {
-    backgroundColor: C.primaryLt,
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: C.primary,
-  },
-  btnAddFeedbackText: {
+  feedbackMessage: {
     fontSize: 13,
-    fontWeight: '600',
-    color: C.primary,
+    color: C.gray800,
+    lineHeight: 18,
   },
+  noFeedbackContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noFeedbackText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: C.gray600,
+  },
+  noFeedbackSubtext: {
+    fontSize: 12,
+    color: C.gray500,
+    marginTop: 4,
+  },
+  addFeedbackBtn: {
+    backgroundColor: C.primaryLight,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  addFeedbackBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.white,
+  },
+
+  starRatingContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  starIcon: {
+    color: C.gray400,
+    marginHorizontal: 2,
+  },
+  starActive: {
+    color: '#FFB800',
+  },
+
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    backgroundColor: C.white,
+    borderRadius: 24,
+    marginTop: 20,
   },
   emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: C.navy,
-    marginBottom: 6,
+    fontSize: 20,
+    fontWeight: '700',
+    color: C.gray800,
+    marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 13,
-    color: C.g500,
+    fontSize: 14,
+    color: C.gray500,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
-  // Modal styles
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: C.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: 60,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: C.g200,
+    borderBottomColor: C.gray100,
   },
-  btnClose: {
-    fontSize: 14,
-    color: C.g500,
+  modalCloseBtn: {
+    paddingVertical: 8,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    color: C.gray600,
     fontWeight: '500',
   },
   modalTitle: {
@@ -553,92 +838,89 @@ const s = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
+    padding: 20,
+  },
+  modalBookingCard: {
+    backgroundColor: C.primaryLighter,
+    borderRadius: 16,
     padding: 16,
-  },
-  modalLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: C.navy,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  bookingInfo: {
-    backgroundColor: C.g50,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: C.navy,
-  },
-  infoSubtext: {
-    fontSize: 12,
-    color: C.g500,
-    marginTop: 4,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  starButton: {
-    padding: 8,
-  },
-  star: {
-    fontSize: 28,
-    opacity: 0.3,
-  },
-  starActive: {
-    opacity: 1,
-  },
-  typeContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.g300,
+    marginBottom: 20,
     alignItems: 'center',
   },
-  typeButtonActive: {
-    backgroundColor: C.primary,
-    borderColor: C.primary,
+  modalVehicleName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.primary,
   },
-  typeButtonText: {
-    fontSize: 11,
+  modalDateRange: {
+    fontSize: 13,
+    color: C.gray700,
+    marginTop: 4,
+  },
+  modalSection: {
+    marginBottom: 24,
+  },
+  modalSectionLabel: {
+    fontSize: 15,
     fontWeight: '600',
-    color: C.g600,
+    color: C.gray800,
+    marginBottom: 12,
   },
-  typeButtonTextActive: {
+  ratingHint: {
+    fontSize: 12,
+    color: C.gray500,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  typeOption: {
+    flex: 1,
+    backgroundColor: C.gray100,
+    paddingVertical: 12,
+    borderRadius: 40,
+    alignItems: 'center',
+  },
+  typeOptionActive: {
+    backgroundColor: C.primary,
+  },
+  typeOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: C.gray700,
+  },
+  typeOptionTextActive: {
     color: C.white,
   },
   messageInput: {
     borderWidth: 1,
-    borderColor: C.g300,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 13,
-    color: C.navy,
+    borderColor: C.gray300,
+    borderRadius: 16,
+    padding: 14,
+    fontSize: 15,
+    color: C.gray900,
     textAlignVertical: 'top',
-    marginBottom: 16,
+    minHeight: 120,
+    backgroundColor: C.white,
   },
-  btnSubmitFeedback: {
+  submitBtn: {
     backgroundColor: C.primary,
-    borderRadius: 8,
-    paddingVertical: 14,
+    borderRadius: 16,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 32,
+    marginTop: 12,
+    marginBottom: 30,
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  btnSubmitFeedbackText: {
-    fontSize: 14,
-    fontWeight: '600',
+  submitBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: C.white,
   },
 });
