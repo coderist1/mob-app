@@ -107,7 +107,7 @@ const Ic = {
       <Path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
     </Svg>
   ),
-  Back: ({ size = 20, color = C.white }) => (
+  Back: ({ size = 20, color = C.gray700 }) => (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <Path d="M15 18l-6-6 6-6" />
     </Svg>
@@ -201,8 +201,6 @@ const PICKER_OPTIONS = {
 function PhotoModal({ visible, currentUri, onClose, onSave, onRemove }) {
   const [step, setStep] = useState('picker');
   const [pendingUri, setPending] = useState(null);
-
-  const open = (s2 = 'picker') => { setStep(s2); setPending(null); };
 
   const handlePickLibrary = async () => {
     const ok = await ensurePermission('library');
@@ -403,7 +401,6 @@ export default function ProfileScreen() {
     setSaving(true);
     setEditError('');
     
-    // Only send fields that the backend accepts
     const updates = {
       first_name: draft.firstName.trim(),
       last_name: draft.lastName.trim(),
@@ -412,7 +409,6 @@ export default function ProfileScreen() {
       username: draft.email.trim().toLowerCase(),
     };
 
-    // Only include phone if it has a value
     if (draft.phone && draft.phone.trim()) {
       updates.phone = draft.phone.trim();
     }
@@ -469,10 +465,10 @@ export default function ProfileScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {/* Header with Back Button */}
+        {/* Header with Back Button - Clean, no dark blue background */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ic.Back size={20} color={C.white} />
+            <Ic.Back size={22} color={C.gray700} />
           </TouchableOpacity>
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>My Profile</Text>
@@ -495,7 +491,6 @@ export default function ProfileScreen() {
             <Text style={[styles.roleLabel, { color: roleMeta.color }]}>{roleMeta.label}</Text>
           </View>
           
-          {/* Edit Button moved here - below the role badge */}
           <TouchableOpacity style={styles.editButtonHero} onPress={() => (editing ? cancelEdit() : setEditing(true))}>
             <Ic.Edit size={14} color={C.white} />
             <Text style={styles.editButtonHeroText}>{editing ? 'Cancel' : 'Edit Profile'}</Text>
@@ -719,16 +714,16 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.navy,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 16,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 8,
     marginBottom: 20,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: C.gray100,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -737,13 +732,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
-    color: C.white,
+    color: C.navy,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
+    color: C.gray500,
     marginTop: 2,
   },
   heroSection: {
