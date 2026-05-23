@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
         if (!session) return;
 
         const savedSession = JSON.parse(session);
-        const userData = { ...savedSession };
+        const userData = savedSession?.user ? { ...savedSession.user } : { ...savedSession };
         delete userData.token;
         delete userData.access;
         delete userData.authToken;
@@ -30,6 +30,8 @@ export function AuthProvider({ children }) {
         delete userData.accessToken;
         delete userData.access_token;
         
+        userData.role = userData.role || 'renter';
+
         if (!mounted) return;
         setUser(userData);
       } catch {
@@ -48,7 +50,8 @@ export function AuthProvider({ children }) {
 
 const persistAuth = useCallback(async (authData) => {
     const token = authData?.token || authData?.access || authData?.authToken || authData?.key || authData?.jwt || authData?.accessToken || authData?.access_token;
-    const userData = { ...authData };
+    
+    const userData = authData?.user ? { ...authData.user } : { ...authData };
     delete userData.token;
     delete userData.access;
     delete userData.authToken;
@@ -57,6 +60,8 @@ const persistAuth = useCallback(async (authData) => {
     delete userData.accessToken;
     delete userData.access_token;
     
+    userData.role = userData.role || 'renter';
+
     const session = { ...userData };
     if (token) session.token = token;
     

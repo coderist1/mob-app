@@ -380,7 +380,34 @@ export default function ProfileScreen() {
 
   const setD = (k, v) => setDraft(d => ({ ...d, [k]: v }));
 
+  const hasUnsavedChanges = React.useMemo(() => {
+    if (!user) return false;
+    return (
+      draft.firstName !== (user.firstName || '') ||
+      draft.lastName !== (user.lastName || '') ||
+      draft.middleName !== (user.middleName || '') ||
+      draft.phone !== (user.phone || '') ||
+      draft.email !== (user.email || '')
+    );
+  }, [draft, user]);
+
   const cancelEdit = () => {
+    if (hasUnsavedChanges) {
+      Alert.alert(
+        'Unsaved Changes',
+        'Would you like to save your changes?',
+        [
+          { text: 'Discard', style: 'destructive', onPress: forceCancel },
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Save', onPress: () => saveEdit(false) },
+        ]
+      );
+    } else {
+      forceCancel();
+    }
+  };
+
+  const forceCancel = () => {
     setDraft({
       firstName: user?.firstName || '',
       lastName: user?.lastName || '',
@@ -392,7 +419,23 @@ export default function ProfileScreen() {
     setEditing(false);
   };
 
-  const saveEdit = () => {
+  const handleBack = () => {
+    if (editing && hasUnsavedChanges) {
+      Alert.alert(
+        'Unsaved Changes',
+        'Would you like to save your changes before leaving?',
+        [
+          { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Save', onPress: () => saveEdit(true) },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  };
+
+  const saveEdit = (navigateBack = false) => {
     if (!draft.firstName.trim() || !draft.lastName.trim() || !draft.email.trim()) {
       setEditError('First name, last name, and email are required.');
       return;
@@ -421,6 +464,9 @@ export default function ProfileScreen() {
         setEditing(false);
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
+        if (navigateBack === true) {
+          router.back();
+        }
       })
       .catch((error) => {
         setSaving(false);
@@ -467,7 +513,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Header with Back Button - Clean, no dark blue background */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
             <Ic.Back size={22} color={C.gray700} />
           </TouchableOpacity>
           <View style={styles.headerTextContainer}>

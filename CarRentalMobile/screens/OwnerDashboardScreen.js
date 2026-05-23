@@ -241,6 +241,24 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
     if (!r.canceled && r.assets?.[0]?.uri) setPhotoUri(r.assets[0].uri);
   };
 
+  const hasUnsavedChanges = useMemo(() => {
+    const init = initial || blank;
+    if (photoUri !== ((initial && initial.photoUri) || null)) return true;
+    return Object.keys(blank).some(k => form[k] !== init[k]);
+  }, [form, initial, photoUri]);
+
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      Alert.alert('Unsaved Changes', 'Would you like to save your changes?', [
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Save', onPress: handleSave },
+      ]);
+    } else {
+      onClose();
+    }
+  };
+
   const handleSave = () => {
     if (!form.brand.trim())      { Alert.alert('Required', 'Brand is required.');             return; }
     if (!form.name.trim())       { Alert.alert('Required', 'Model/Name is required.');        return; }
@@ -257,7 +275,7 @@ function VehicleFormModal({ visible, onClose, onSave, initial, isEdit }) {
       <View style={{ flex: 1, backgroundColor: C.white }}>
         <View style={s.modalHeader}>
           <Text style={s.modalTitle}>{isEdit ? 'Edit Vehicle' : 'Add New Vehicle'}</Text>
-          <TouchableOpacity onPress={onClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
+          <TouchableOpacity onPress={handleClose}><Text style={s.modalClose}>✕</Text></TouchableOpacity>
         </View>
 
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>

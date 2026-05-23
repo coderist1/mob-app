@@ -15,9 +15,11 @@ export default function Index() {
   }
 
   if (!user) return <Redirect href="/login" />;
-  if (user.role === 'owner') return <Redirect href="/dashboard" />;
-  if (user.role === 'renter') return <Redirect href="/renter" />;
-  if (user.role === 'admin') return <Redirect href="/admin" />;
+  
+  const role = user.role || 'renter';
+  if (role === 'owner') return <Redirect href="/dashboard" />;
+  if (role === 'renter') return <Redirect href="/renter" />;
+  if (role === 'admin') return <Redirect href="/admin" />;
 
   return <Redirect href="/login" />;
 }

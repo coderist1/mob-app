@@ -129,7 +129,7 @@ export function VehicleProvider({ children }) {
 
        // 2. Fetch from backend
       const data = await apiRequest('/api/cars/');
-      console.warn('[VehicleContext] loadVehicles fetched', Array.isArray(data) ? data.length : 0, 'items');
+      console.log('[VehicleContext] loadVehicles fetched', Array.isArray(data) ? data.length : 0, 'items');
       if (Array.isArray(data)) {
         const apiVehicles = data.map(fromApiVehicle);
         

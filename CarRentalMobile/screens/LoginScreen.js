@@ -78,19 +78,22 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    if (user.role === 'owner') {
+    
+    const role = user.role || 'renter';
+    if (role === 'owner') {
       router.replace('/dashboard');
       return;
     }
-    if (user.role === 'renter') {
+    if (role === 'renter') {
       router.replace('/renter');
       return;
     }
-    if (user.role === 'admin') {
+    if (role === 'admin') {
       router.replace('/admin');
       return;
     }
-    router.replace('/login');
+    
+    console.warn('Unknown user role:', user.role);
   }, [authLoading, user, router]);
 
   const scrollToField = (name) => {
@@ -118,7 +121,7 @@ export default function LoginScreen() {
       return;
     }
 
-    switch (result.user.role) {
+    switch (result.user.role || 'renter') {
       case 'owner':
         router.replace('/dashboard');
         break;
@@ -141,6 +144,7 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 10 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 

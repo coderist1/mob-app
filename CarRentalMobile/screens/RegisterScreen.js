@@ -345,7 +345,8 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: C.navy }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={insets.top + 10}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 10 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
