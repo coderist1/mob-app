@@ -46,6 +46,7 @@ const BADGE = {
 
 function BookingCard({ item, isExpanded, onToggle, userRole }) {
   const { returnVehicle } = useBookings();
+  const router = useRouter();
   const bc = BADGE[item.status] || BADGE.pending;
   const days = Math.max(0, Math.round((new Date(item.endDate) - new Date(item.startDate)) / 86400000));
   const dailyRate = days > 0 ? Math.round(item.totalPrice / days) : 0;
@@ -171,7 +172,7 @@ function BookingCard({ item, isExpanded, onToggle, userRole }) {
 
             {item.status === 'completed' && (
               <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity style={s.btnOutline} onPress={() => Alert.alert('Review', 'Review feature coming soon')}>
+                <TouchableOpacity style={s.btnOutline} onPress={() => router.push('/feedback')}>
                   <Text style={s.btnOutlineText}>Leave Review</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.btnPrimary, { flex: 1 }]}>
