@@ -1,6 +1,9 @@
 # Car Rental Mobile Documentation
 
-This document describes the current app structure, data flow, routes, and backend integration for the Expo mobile client.
+> **Unified system:** Web and mobile share one FastAPI backend and one database.
+> See the master architecture guide: [FastAPI README](../../../fastapi/README.md)
+
+This document describes the app structure, data flow, routes, and backend integration for the Expo mobile client.
 
 ## Overview
 

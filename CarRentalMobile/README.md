@@ -1,35 +1,71 @@
 # Car Rental Mobile
 
-Expo Router mobile app for a car rental workflow with owner, renter, and admin roles.
+Expo Router mobile app for the Car Rental System. Shares the **same backend and database** as the web app.
 
-## Start Here
+> Full system docs (architecture, deployment, sync): see [FastAPI README](../../fastapi/README.md)
 
-For the full project documentation, see [docs/README.md](docs/README.md).
+## Quick Start
 
-## Expo Go
-
-```bash
+```powershell
 npm install
 npx expo start
 ```
 
-Open the Expo Go app on your phone and scan the QR code from the Expo terminal or browser.
+Scan the QR code with **Expo Go** on your phone.
 
-## Android APK
+## Backend Connection
 
-This project already has an EAS build profile for an Android APK in [eas.json](eas.json).
+Both web and mobile must point to the **same backend URL**.
 
-```bash
-npx eas build -p android --profile production
+**Local development** (`.env`):
+
+```env
+EXPO_PUBLIC_API_URL=http://YOUR_PC_LAN_IP:8000
 ```
 
-## Environment
+Use your PC's LAN IP from `ipconfig`. Phone and PC must be on the same Wi-Fi.
 
-Set the backend base URL in `.env`:
+**Production** (`.env` or `eas.json`):
 
 ```env
 EXPO_PUBLIC_API_URL=https://fastapi-n7sg.onrender.com
 ```
 
-The app also supports runtime overrides through the shell environment before Expo starts.
+Start the backend first:
 
+```powershell
+cd c:\Users\Acer\fastapi
+.\run.ps1
+```
+
+## Features
+
+- Owner, Renter, and Admin dashboards
+- Vehicle management with photo upload
+- Booking workflow with calendar picker
+- Log / damage reports synced to backend
+- Bearer token auth stored in AsyncStorage
+
+## Build APK
+
+```powershell
+npx eas build -p android --profile production
+```
+
+Rebuild after backend or auth changes so the APK picks up the latest code.
+
+## Test Accounts
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@gmail.com | Admin123 | admin |
+| matowner1@gmail.com | Owner123 | owner |
+| matrenter1@gmail.com | admin123 | renter |
+
+## Sync with Web
+
+1. Log in with the same account on web and mobile
+2. Add a vehicle or booking on one client
+3. Refresh the other — data comes from the shared Render database
+
+See [docs/README.md](docs/README.md) for screen and context details.
