@@ -24,7 +24,7 @@ The app uses shared React contexts for authentication, vehicles, bookings, log r
 
 ## Run And Build
 
-Install dependencies and start the app:
+Install dependencies and start the app in Expo Go:
 
 ```bash
 npm install
@@ -39,6 +39,14 @@ Expo Go launch flow:
 4. Make sure your phone and development machine are on the same network, or use Expo's tunnel mode if needed.
 
 This project is currently compatible with Expo Go because it only uses Expo-supported native modules.
+
+Android APK build flow:
+
+```bash
+npx eas build -p android --profile production
+```
+
+The Android APK profile is already defined in [eas.json](eas.json) with `buildType: "apk"`.
 
 Other available scripts from `package.json`:
 
