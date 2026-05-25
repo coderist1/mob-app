@@ -31,6 +31,15 @@ npm install
 npx expo start
 ```
 
+Expo Go launch flow:
+
+1. Start Metro with `npx expo start`.
+2. Open the Expo Go app on your phone.
+3. Scan the QR code from the terminal or browser.
+4. Make sure your phone and development machine are on the same network, or use Expo's tunnel mode if needed.
+
+This project is currently compatible with Expo Go because it only uses Expo-supported native modules.
+
 Other available scripts from `package.json`:
 
 - `npm run android`: launch on an Android device or emulator.
