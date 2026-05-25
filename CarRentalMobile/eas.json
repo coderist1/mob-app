@@ -4,6 +4,9 @@
   },
   "build": {
     "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fastapi-n7sg.onrender.com"
+      },
       "android": {
         "buildType": "apk"
       }
