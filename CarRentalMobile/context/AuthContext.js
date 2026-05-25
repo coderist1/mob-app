@@ -98,12 +98,12 @@ const persistAuth = useCallback(async (authData) => {
           email: normalizedEmail,
           username: normalizedEmail,
           password,
-          first_name: userData?.firstName || '',
-          last_name: userData?.lastName || '',
-          middle_name: userData?.middleName || '',
+          firstName: userData?.firstName || '',
+          lastName: userData?.lastName || '',
+          middleName: userData?.middleName || '',
           role: userData?.role || 'renter',
           sex: userData?.sex || '',
-          date_of_birth: userData?.dateOfBirth || null,
+          dateOfBirth: userData?.dateOfBirth || null,
         },
       });
 
@@ -127,17 +127,16 @@ const updateUser = useCallback(async (partial) => {
       const nextEmail = partial?.email ?? partial?.username ?? currentEmail;
       console.log('[AuthContext] updateUser received:', partial);
 
-      if (partial?.firstName !== undefined) payload.first_name = partial.firstName;
-      if (partial?.lastName !== undefined) payload.last_name = partial.lastName;
-      if (partial?.middleName !== undefined) payload.middle_name = partial.middleName;
-      if (partial?.phone !== undefined) payload.phone = partial.phone;
-      if (partial?.photoUri !== undefined) payload.photo_uri = partial.photoUri;
+      if (partial?.firstName !== undefined) payload.firstName = partial.firstName;
+      if (partial?.lastName !== undefined) payload.lastName = partial.lastName;
+      if (partial?.middleName !== undefined) payload.middleName = partial.middleName;
+      if (partial?.sex !== undefined) payload.sex = partial.sex;
+      if (partial?.dateOfBirth !== undefined) payload.dateOfBirth = partial.dateOfBirth;
 
-      if (partial?.first_name !== undefined) payload.first_name = partial.first_name;
-      if (partial?.last_name !== undefined) payload.last_name = partial.last_name;
-      if (partial?.middle_name !== undefined) payload.middle_name = partial.middle_name;
-      if (partial?.phone_number !== undefined) payload.phone = partial.phone_number;
-      if (partial?.photo_uri !== undefined) payload.photo_uri = partial.photo_uri;
+      if (partial?.first_name !== undefined) payload.firstName = partial.first_name;
+      if (partial?.last_name !== undefined) payload.lastName = partial.last_name;
+      if (partial?.middle_name !== undefined) payload.middleName = partial.middle_name;
+      if (partial?.date_of_birth !== undefined) payload.dateOfBirth = partial.date_of_birth;
 
       if (partial?.email !== undefined || partial?.username !== undefined || currentEmail) {
         payload.email = nextEmail;
@@ -177,7 +176,13 @@ const updateUser = useCallback(async (partial) => {
 
       const mergedUser = { ...user, ...normalizedResponse };
       setUser(mergedUser);
-      await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(mergedUser));
+
+      const sessionRaw = await AsyncStorage.getItem(SESSION_KEY);
+      const existingSession = sessionRaw ? JSON.parse(sessionRaw) : {};
+      await AsyncStorage.setItem(
+        SESSION_KEY,
+        JSON.stringify({ ...existingSession, ...mergedUser, token: existingSession.token }),
+      );
 
       return mergedUser;
     } catch (error) {
