@@ -65,10 +65,10 @@ The backend base URL is resolved in two places:
 
 Supported backend targets include:
 
-- Local device or LAN backend via `EXPO_PUBLIC_API_URL`.
-- Android emulator fallback to `10.0.2.2`.
-- iOS simulator fallback to `127.0.0.1`.
-- General localhost fallback to `http://localhost:8000`.
+- Production backend via `EXPO_PUBLIC_API_URL=https://fastapi-n7sg.onrender.com`.
+- Android emulator fallback to `10.0.2.2` only when no production URL is provided.
+- iOS simulator fallback to `127.0.0.1` only when no production URL is provided.
+- General localhost fallback to `http://localhost:8000` only when no production URL is provided.
 
 The app is configured with cleartext traffic enabled on Android, which is important for local HTTP development.
 

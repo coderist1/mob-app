@@ -112,21 +112,20 @@ export function BookingProvider({ children }) {
   const loadBookings = useCallback(async () => {
     let mounted = true;
     try {
-      // 1) Load local cache first
       const raw = await AsyncStorage.getItem(BOOKINGS_KEY);
       if (!mounted) return;
       const localBookings = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(localBookings) && localBookings.length > 0) {
-        setBookings(localBookings);
-      }
 
-       // 2) Try fetching from backend (multiple possible endpoints)
-       const endpoints = ['/api/bookings/', '/api/rentals/', '/api/reservations/'];
+      // Prefer backend data so the same records appear in web and mobile.
+      const endpoints = ['/api/bookings/', '/api/rentals/', '/api/reservations/'];
       let remote = null;
       for (const ep of endpoints) {
         try {
           const data = await apiRequest(ep, { method: 'GET' });
-          if (Array.isArray(data)) { remote = data; break; }
+          if (Array.isArray(data)) {
+            remote = data;
+            break;
+          }
         } catch (e) {
           // try next
         }
@@ -140,17 +139,22 @@ export function BookingProvider({ children }) {
           return normalizeBookingRecord(b, localMatch || {});
         });
 
-        // Merge remote and local (remote authoritative)
-        const byId = new Map();
-        normalized.forEach(r => byId.set(String(r.id), r));
-        (localBookings || []).forEach(l => { if (!byId.has(String(l.id))) byId.set(String(l.id), l); });
-        const merged = Array.from(byId.values());
-        setBookings(merged);
-        // persist merged cache
-        AsyncStorage.setItem(BOOKINGS_KEY, JSON.stringify(merged)).catch(() => {});
+        setBookings(normalized);
+        AsyncStorage.setItem(BOOKINGS_KEY, JSON.stringify(normalized)).catch(() => {});
+        return;
+      }
+
+      if (Array.isArray(localBookings) && localBookings.length > 0) {
+        setBookings(localBookings);
       }
     } catch (error) {
       console.warn('[BookingContext] Failed to load bookings', error);
+
+      const raw = await AsyncStorage.getItem(BOOKINGS_KEY);
+      const localBookings = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(localBookings) && localBookings.length > 0) {
+        setBookings(localBookings);
+      }
     } finally {
       if (mounted) setLoading(false);
     }

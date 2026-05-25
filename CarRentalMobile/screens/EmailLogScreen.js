@@ -35,33 +35,6 @@ const C = {
   info: '#3b82f6',
 };
 
-const DEMO_EMAIL_LOGS = [
-  {
-    id: 'e1',
-    type: 'registration',
-    to: 'renter@test.com',
-    subject: 'Welcome to Car Rental',
-    body: 'Your account has been created successfully.',
-    sentAt: '2026-03-10T08:22:00.000Z',
-  },
-  {
-    id: 'e2',
-    type: 'rental',
-    to: 'owner@test.com',
-    subject: 'New booking request',
-    body: 'A renter requested your vehicle for 3 days.',
-    sentAt: '2026-03-11T11:10:00.000Z',
-  },
-  {
-    id: 'e3',
-    type: 'password',
-    to: 'admin@test.com',
-    subject: 'Password changed',
-    body: 'Your password was changed successfully.',
-    sentAt: '2026-03-13T12:35:00.000Z',
-  },
-];
-
 const TAB_LABELS = {
   all: 'All',
   registration: 'Register',
@@ -76,7 +49,7 @@ export default function EmailLogScreen() {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [logs, setLogs] = useState(DEMO_EMAIL_LOGS);
+  const [logs, setLogs] = useState([]);
 
   const normalizeLog = (item) => ({
     id: item.id ?? item.pk ?? `email_${Date.now()}`,
@@ -141,7 +114,7 @@ export default function EmailLogScreen() {
       }
     });
 
-    return generated.length > 0 ? generated.map(normalizeLog) : DEMO_EMAIL_LOGS;
+    return generated.length > 0 ? generated.map(normalizeLog) : [];
   };
 
   const handleRefresh = async () => {

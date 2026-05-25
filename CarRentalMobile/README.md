@@ -28,7 +28,7 @@ npx eas build -p android --profile production
 Set the backend base URL in `.env`:
 
 ```env
-EXPO_PUBLIC_API_URL=http://192.168.254.107:8000
+EXPO_PUBLIC_API_URL=https://fastapi-n7sg.onrender.com
 ```
 
 The app also supports runtime overrides through the shell environment before Expo starts.

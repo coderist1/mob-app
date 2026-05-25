@@ -120,39 +120,30 @@ export function VehicleProvider({ children }) {
 
   const loadVehicles = useCallback(async () => {
     try {
-      // 1. Load locally saved cars immediately so they don't disappear
+      const localData = await AsyncStorage.getItem('carRental.vehicles.local');
+      const localVehicles = localData ? JSON.parse(localData) : [];
+
+      // Fetch from the backend first so the server remains the source of truth.
+      const data = await apiRequest('/api/cars/');
+      console.log('[VehicleContext] loadVehicles fetched', Array.isArray(data) ? data.length : 0, 'items');
+      if (Array.isArray(data)) {
+        const apiVehicles = data.map(fromApiVehicle);
+        mutateVehicles(apiVehicles);
+        return;
+      }
+
+      // Fall back to local cache only if the backend cannot be reached.
+      if (localVehicles.length > 0) {
+        setVehicles(localVehicles);
+      }
+    } catch (error) {
+      console.warn('[VehicleContext] Failed to load vehicles', error);
+
       const localData = await AsyncStorage.getItem('carRental.vehicles.local');
       const localVehicles = localData ? JSON.parse(localData) : [];
       if (localVehicles.length > 0) {
         setVehicles(localVehicles);
       }
-
-       // 2. Fetch from backend
-      const data = await apiRequest('/api/cars/');
-      console.log('[VehicleContext] loadVehicles fetched', Array.isArray(data) ? data.length : 0, 'items');
-      if (Array.isArray(data)) {
-        const apiVehicles = data.map(fromApiVehicle);
-        
-        // 3. Merge API and local data to ensure backend doesn't overwrite your added cars
-        const merged = [...apiVehicles];
-        const apiIds = new Set(apiVehicles.map(v => v.id));
-
-        localVehicles.forEach(localV => {
-          if (!apiIds.has(localV.id)) {
-            merged.push(localV); // Keep cars that backend failed to return
-          } else {
-            const apiIdx = merged.findIndex(v => v.id === localV.id);
-            if (apiIdx >= 0 && !merged[apiIdx].ownerId && localV.ownerId) {
-              // Restore owner info if backend forgot it
-              merged[apiIdx] = { ...merged[apiIdx], ownerId: localV.ownerId, ownerName: localV.ownerName };
-            }
-          }
-        });
-
-        mutateVehicles(merged);
-      }
-    } catch (error) {
-      console.warn('[VehicleContext] Failed to load vehicles', error);
     }
   }, [mutateVehicles]);
 

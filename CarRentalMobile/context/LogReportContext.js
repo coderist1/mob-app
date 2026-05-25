@@ -26,13 +26,12 @@ export function LogReportProvider({ children }) {
 
   const loadReports = useCallback(async () => {
     try {
-      // 1) load local cache
       if (AsyncStorage) {
         const raw = await AsyncStorage.getItem(LOG_KEY);
         if (raw) setReports(JSON.parse(raw));
       }
 
-       // 2) try to fetch remote reports from several possible endpoints
+      // Prefer the remote backend so all clients see the same data.
       const endpoints = ['/api/log-reports/', '/api/logreports/', '/api/log_reports/'];
       for (const ep of endpoints) {
         try {
@@ -79,22 +78,21 @@ export function LogReportProvider({ children }) {
       checkout: null,
     };
 
-    // optimistic local add
-    setReports(prev => {
-      const next = prev.some(r => r.id === newReport.id) ? prev : [...prev, newReport];
-      try { if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(()=>{}); } catch(_){}
-      return next;
-    });
-
-     // attempt to persist remotely
-     (async () => {
+    // Persist remotely first, then mirror the authoritative result locally.
+    (async () => {
       const endpoints = ['/api/log-reports/', '/api/logreports/', '/api/log_reports/'];
        for (const ep of endpoints) {
          try {
            const created = await apiRequest(ep, { method: 'POST', body: report });
            if (created) {
              const normalized = { id: created.id ?? created.pk ?? newReport.id, ...created };
-             setReports(prev => prev.map(r => (String(r.id) === String(newReport.id) ? normalized : r)));
+             setReports(prev => {
+               const next = prev.some(r => String(r.id) === String(normalized.id))
+                 ? prev.map(r => (String(r.id) === String(normalized.id) ? normalized : r))
+                 : [normalized, ...prev.filter(r => String(r.id) !== String(newReport.id))];
+               if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(()=>{});
+               return next;
+             });
              if (AsyncStorage) {
                try {
                  const raw = await AsyncStorage.getItem(LOG_KEY);
@@ -111,6 +109,12 @@ export function LogReportProvider({ children }) {
          }
        }
      })();
+
+    setReports(prev => {
+      const next = prev.some(r => r.id === newReport.id) ? prev : [...prev, newReport];
+      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(()=>{});
+      return next;
+    });
 
     return newReport;
   }, []);
