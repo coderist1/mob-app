@@ -1,0 +1,11 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit",
+    "source.sortMembers": "explicit"
+  },
+  "python.defaultInterpreterPath": "c:/Users/Acer/AppData/Local/Python/PYTHONCORE-3.14-64/python.exe",
+  "python.analysis.extraPaths": [
+    "C:/Users/Acer/fastapi"
+  ]
+}
