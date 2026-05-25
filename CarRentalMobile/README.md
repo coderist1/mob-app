@@ -1,32 +1,25 @@
-# Car Rental Mobile (Expo)
+# Car Rental Mobile
 
-## Run
+Expo Router mobile app for a car rental workflow with owner, renter, and admin roles.
+
+## Start Here
+
+For the full project documentation, see [docs/README.md](docs/README.md).
+
+## Quick Start
 
 ```bash
 npm install
 npx expo start
 ```
 
-## Backend Connection
+## Environment
 
-The app reads the backend base URL from the `EXPO_PUBLIC_API_URL` environment variable. If that is not set, the client falls back to the current Expo host or the appropriate simulator/emulator localhost address.
-
-Create or update `.env` in the project root with your local LAN IP, for example:
+Set the backend base URL in `.env`:
 
 ```env
 EXPO_PUBLIC_API_URL=http://192.168.254.107:8000
 ```
 
-Then start Expo normally:
-
-```bash
-npx expo start
-```
-
-If you want to override it at runtime, set the variable in your shell before launching Expo:
-
-```bash
-set EXPO_PUBLIC_API_URL=http://192.168.1.50:8000
-npx expo start
-```
+The app also supports runtime overrides through the shell environment before Expo starts.
 
