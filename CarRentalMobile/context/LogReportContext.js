@@ -1,202 +1,206 @@
 // context/LogReportContext.js
-// Provides log report CRUD for owners and renters.
-// Uses @react-native-async-storage/async-storage for persistence.
-// Run: npx expo install @react-native-async-storage/async-storage
-
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiRequest } from '../services/api';
-
-let AsyncStorage = null;
-try {
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
-} catch (_) {
-  // Package not yet installed — data will not persist between app restarts.
-  // Fix: run  npx expo install @react-native-async-storage/async-storage
-  console.warn('[LogReportContext] AsyncStorage not available. Data will not persist.');
-}
+import {
+  fromApiReport,
+  toApiPayload,
+  updatesToApiPatch,
+} from '../utils/logReportUtils';
 
 const LOG_KEY = 'logReports';
+const LOG_ENDPOINTS = ['/api/logreports/', '/api/log-reports/'];
 
-/* ─── Context ─── */
 const LogReportContext = createContext(null);
+
+async function requestLogReport(method, pathSuffix = '', body) {
+  let lastError;
+  for (const base of LOG_ENDPOINTS) {
+    try {
+      return await apiRequest(`${base}${pathSuffix}`, {
+        method,
+        ...(body !== undefined ? { body } : {}),
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Log report request failed');
+}
 
 export function LogReportProvider({ children }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadReports = useCallback(async () => {
-    try {
-      if (AsyncStorage) {
-        const raw = await AsyncStorage.getItem(LOG_KEY);
-        if (raw) setReports(JSON.parse(raw));
-      }
-
-      // Prefer the remote backend so all clients see the same data.
-      const endpoints = ['/api/log-reports/', '/api/logreports/', '/api/log_reports/'];
-      for (const ep of endpoints) {
-        try {
-          const data = await apiRequest(ep, { method: 'GET' });
-          if (Array.isArray(data)) {
-            setReports(data.map(d => ({ id: d.id ?? d.pk ?? `lr_${Date.now()}`, ...d })));
-            if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(data)).catch(()=>{});
-            break;
-          }
-        } catch (e) {
-          // try next
-        }
-      }
-    } catch (e) {
-      console.warn('[LogReportContext] load error', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  /* Load persisted reports on mount */
-  useEffect(() => {
-    loadReports();
-  }, [loadReports]);
-
-  /* Persist helper */
-  const persist = useCallback(async (next) => {
+  const persistReports = useCallback(async (next) => {
     setReports(next);
     try {
-      if (AsyncStorage) await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
+      await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
     } catch (e) {
       console.warn('[LogReportContext] persist error', e);
     }
   }, []);
 
-  /* ── CRUD ── */
+  const loadReports = useCallback(async () => {
+    try {
+      const data = await requestLogReport('GET');
+      if (Array.isArray(data)) {
+        const normalized = data
+          .filter((item) => item.type !== 'feedback' && item.type !== 'damage')
+          .map((item) => fromApiReport(item));
+        await persistReports(normalized);
+        return;
+      }
+    } catch (e) {
+      console.warn('[LogReportContext] remote load failed', e);
+    }
 
-  /** Create a new check-in report */
+    try {
+      const raw = await AsyncStorage.getItem(LOG_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (Array.isArray(cached)) {
+          setReports(cached.map((item) => fromApiReport(item)));
+        }
+      }
+    } catch (e) {
+      console.warn('[LogReportContext] cache load error', e);
+    }
+  }, [persistReports]);
+
+  useEffect(() => {
+    (async () => {
+      await loadReports();
+      setLoading(false);
+    })();
+  }, [loadReports]);
+
   const addReport = useCallback(async (report) => {
-    const newReport = {
-      ...report,
+    const optimistic = fromApiReport({
+      ...toApiPayload(report),
       id: report.id || `lr_${Date.now()}`,
       createdAt: report.createdAt || new Date().toISOString(),
-      checkout: null,
+    });
+    optimistic.rental = { ...optimistic.rental, ...(report.rental || {}) };
+    optimistic.checkin = { ...optimistic.checkin, ...(report.checkin || {}) };
+    optimistic.checkout = report.checkout ?? null;
+    optimistic.comments = report.comments || [];
+
+    setReports((prev) => {
+      const next = [optimistic, ...prev.filter((r) => String(r.id) !== String(optimistic.id))];
+      AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+
+    try {
+      const created = await requestLogReport('POST', '', toApiPayload(report));
+      const normalized = fromApiReport(created);
+      setReports((prev) => {
+        const next = prev.map((r) => (String(r.id) === String(optimistic.id) ? normalized : r));
+        if (!next.some((r) => String(r.id) === String(normalized.id))) next.unshift(normalized);
+        AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+      return normalized;
+    } catch (error) {
+      console.warn('[LogReportContext] create failed', error);
+      throw error;
+    }
+  }, [persistReports]);
+
+  const addCheckout = useCallback(async (reportId, checkoutData) => {
+    const checkout = { ...checkoutData, createdAt: new Date().toISOString() };
+
+    setReports((prev) => {
+      const next = prev.map((r) =>
+        String(r.id) === String(reportId) ? { ...r, checkout } : r
+      );
+      AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+
+    await requestLogReport('POST', `${reportId}/checkout/`, checkout);
+
+    const refreshed = await requestLogReport('GET');
+    if (Array.isArray(refreshed)) {
+      const match = refreshed.find((r) => String(r.id) === String(reportId));
+      if (match) {
+        const normalized = fromApiReport(match);
+        setReports((prev) => {
+          const next = prev.map((r) => (String(r.id) === String(reportId) ? normalized : r));
+          AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+      }
+    }
+  }, []);
+
+  const updateReport = useCallback(async (reportId, updates) => {
+    const existing = reports.find((r) => String(r.id) === String(reportId));
+
+    if (updates.checkout && !existing?.checkout) {
+      await addCheckout(reportId, updates.checkout);
+      return;
+    }
+
+    const merged = existing
+      ? {
+          ...existing,
+          checkin: updates.checkin ? { ...existing.checkin, ...updates.checkin } : existing.checkin,
+          checkout: updates.checkout !== undefined ? updates.checkout : existing.checkout,
+          comments: updates.comments ?? existing.comments,
+        }
+      : null;
+
+    if (merged) {
+      setReports((prev) => {
+        const next = prev.map((r) => (String(r.id) === String(reportId) ? merged : r));
+        AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+        return next;
+      });
+    }
+
+    const patch = updatesToApiPatch(updates, existing);
+    if (Object.keys(patch).length === 0) return;
+
+    const updated = await requestLogReport('PATCH', `${reportId}/`, patch);
+    const normalized = fromApiReport(updated);
+    setReports((prev) => {
+      const next = prev.map((r) => (String(r.id) === String(reportId) ? normalized : r));
+      AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, [addCheckout, reports]);
+
+  const deleteReport = useCallback(async (reportId) => {
+    setReports((prev) => {
+      const next = prev.filter((r) => String(r.id) !== String(reportId));
+      AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+
+    try {
+      await requestLogReport('DELETE', `${reportId}/`);
+    } catch (error) {
+      console.warn('[LogReportContext] delete failed', error);
+      await loadReports();
+      throw error;
+    }
+  }, [loadReports]);
+
+  const addComment = useCallback(async (reportId, comment) => {
+    const payload = {
+      author: comment.author || comment.name || 'Anonymous',
+      message: comment.message || comment.text || '',
     };
 
-    // Persist remotely first, then mirror the authoritative result locally.
-    (async () => {
-      const endpoints = ['/api/log-reports/', '/api/logreports/', '/api/log_reports/'];
-       for (const ep of endpoints) {
-         try {
-           const created = await apiRequest(ep, { method: 'POST', body: report });
-           if (created) {
-             const normalized = { id: created.id ?? created.pk ?? newReport.id, ...created };
-             setReports(prev => {
-               const next = prev.some(r => String(r.id) === String(normalized.id))
-                 ? prev.map(r => (String(r.id) === String(normalized.id) ? normalized : r))
-                 : [normalized, ...prev.filter(r => String(r.id) !== String(newReport.id))];
-               if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(()=>{});
-               return next;
-             });
-             if (AsyncStorage) {
-               try {
-                 const raw = await AsyncStorage.getItem(LOG_KEY);
-                 const cur = raw ? JSON.parse(raw) : [];
-                 const next = cur.map(r => (String(r.id) === String(newReport.id) ? normalized : r));
-                 if (!next.some(r => String(r.id) === String(normalized.id))) next.push(normalized);
-                 await AsyncStorage.setItem(LOG_KEY, JSON.stringify(next));
-               } catch (_) {}
-             }
-           }
-           break;
-         } catch (e) {
-           // try next
-         }
-       }
-     })();
-
-    setReports(prev => {
-      const next = prev.some(r => r.id === newReport.id) ? prev : [...prev, newReport];
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(()=>{});
+    const result = await requestLogReport('POST', `${reportId}/comments/`, payload);
+    const normalized = fromApiReport(result);
+    setReports((prev) => {
+      const next = prev.map((r) => (String(r.id) === String(reportId) ? normalized : r));
+      AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
-
-    return newReport;
-  }, []);
-
-  /** Add / update check-out on an existing report */
-  const addCheckout = useCallback(async (reportId, checkoutData) => {
-    setReports(prev => {
-      const next = prev.map(r =>
-        r.id === reportId
-          ? { ...r, checkout: { ...checkoutData, createdAt: new Date().toISOString() } }
-          : r
-      );
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-     // attempt to persist checkout to server
-     (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logreports/${reportId}/`, `/api/log_reports/${reportId}/`];
-       for (const ep of endpoints) {
-         try {
-           await apiRequest(ep, { method: 'PATCH', body: { checkout: checkoutData } });
-           break;
-         } catch (e) {}
-       }
-     })();
-  }, []);
-
-  /** Update check-in fields on an existing report */
-  const updateReport = useCallback(async (reportId, updates) => {
-    setReports(prev => {
-      const next = prev.map(r => r.id === reportId ? { ...r, ...updates } : r);
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-     (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/`, `/api/logreports/${reportId}/`, `/api/log_reports/${reportId}/`];
-       for (const ep of endpoints) {
-         try {
-           await apiRequest(ep, { method: 'PATCH', body: updates });
-           break;
-         } catch (e) {}
-       }
-     })();
-  }, []);
-
-  /** Delete a report */
-  const deleteReport = useCallback(async (reportId) => {
-    setReports(prev => {
-      const next = prev.filter(r => r.id !== reportId);
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-     (async () => {
-       const endpoints = [`/log-reports/${reportId}/`, `/logs/${reportId}/`, `/reports/${reportId}/`];
-       for (const ep of endpoints) {
-         try { await apiRequest(ep, { method: 'DELETE' }); break; } catch (e) {}
-       }
-     })();
-  }, []);
-
-  /** Add a comment to a report */
-  const addComment = useCallback(async (reportId, comment) => {
-    setReports(prev => {
-      const next = prev.map(r =>
-        r.id === reportId
-          ? { ...r, comments: [...(r.comments || []), { ...comment, id: `c_${Date.now()}`, createdAt: new Date().toISOString() }] }
-          : r
-      );
-      if (AsyncStorage) AsyncStorage.setItem(LOG_KEY, JSON.stringify(next)).catch(() => {});
-      return next;
-    });
-
-     // attempt to persist comment remotely
-     (async () => {
-      const endpoints = [`/api/log-reports/${reportId}/comments/`, `/api/logreports/${reportId}/comments/`, `/api/log_reports/${reportId}/comments/`];
-       for (const ep of endpoints) {
-         try { await apiRequest(ep, { method: 'POST', body: comment }); break; } catch (e) {}
-       }
-     })();
   }, []);
 
   const value = {

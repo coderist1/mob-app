@@ -82,7 +82,7 @@ const DetailRow = ({ label, value }) => (
 );
 
 function BookingCard({ item, isExpanded, onToggle, userRole }) {
-  const { returnVehicle, updateBookingStatus } = useBookings();
+  const { returnVehicle, setBookingStatus } = useBookings();
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const days = getDaysBetween(item.startDate, item.endDate);
@@ -105,8 +105,8 @@ function BookingCard({ item, isExpanded, onToggle, userRole }) {
         text: 'Yes, Cancel', 
         style: 'destructive', 
         onPress: () => {
-          if (updateBookingStatus) {
-            updateBookingStatus(item.id, 'rejected', 'Cancelled by renter');
+          if (setBookingStatus) {
+            setBookingStatus(item.id, 'rejected', 'Cancelled by renter');
           } else {
             Alert.alert('Cancelled', 'Booking has been cancelled.');
           }
@@ -118,15 +118,15 @@ function BookingCard({ item, isExpanded, onToggle, userRole }) {
   const handleApprove = () => {
     Alert.alert('Approve Request', 'Confirm to approve this booking request.', [
       { text: 'No', style: 'cancel' },
-      { text: 'Yes, Approve', onPress: () => updateBookingStatus?.(item.id, 'approved') }
+      { text: 'Yes, Approve', onPress: () => setBookingStatus?.(item.id, 'approved') }
     ]);
   };
 
   const handleReject = () => {
     Alert.alert('Reject Request', 'Reason for rejection?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Vehicle Unavailable', onPress: () => updateBookingStatus?.(item.id, 'rejected', 'Vehicle unavailable') },
-      { text: 'Other Reason', onPress: () => updateBookingStatus?.(item.id, 'rejected', 'Request rejected by owner') },
+      { text: 'Vehicle Unavailable', onPress: () => setBookingStatus?.(item.id, 'rejected', 'Vehicle unavailable') },
+      { text: 'Other Reason', onPress: () => setBookingStatus?.(item.id, 'rejected', 'Request rejected by owner') },
     ]);
   };
 

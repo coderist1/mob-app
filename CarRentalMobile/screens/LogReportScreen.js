@@ -598,9 +598,16 @@ export default function LogReportScreen({ hideHeader = false, pendingRental, onC
 
   const myReports = useMemo(() => {
     if (isOwner) return reports;
-    if (isRenter) return reports.filter(r => r.rental?.renterId === user?.id);
+    if (isRenter) {
+      const email = (user?.email || '').toLowerCase();
+      return reports.filter((r) =>
+        (r.rental?.renterEmail || '').toLowerCase() === email
+        || String(r.rental?.renterId) === String(user?.id)
+        || (r.rental?.renterName || '').toLowerCase() === (user?.fullName || user?.firstName || '').toLowerCase()
+      );
+    }
     return [];
-  }, [reports, user]);
+  }, [reports, user, isOwner, isRenter]);
 
   const filteredReports = useMemo(() => {
     let result = myReports;
@@ -620,7 +627,19 @@ export default function LogReportScreen({ hideHeader = false, pendingRental, onC
     return result;
   }, [myReports, search, filter]);
 
-  const handleNewSave = async ({ rental, checkin }) => { await addReport({ rental, checkin, checkout: null, comments: [] }); setNewEntry(null); };
+  const handleNewSave = async ({ rental, checkin }) => {
+    const rentalWithMeta = {
+      ...rental,
+      renterEmail: rental.renterEmail || rental.renter_email,
+    };
+    try {
+      await addReport({ rental: rentalWithMeta, checkin, checkout: null, comments: [] });
+      setNewEntry(null);
+      Alert.alert('Saved', 'Log report saved successfully.');
+    } catch (error) {
+      Alert.alert('Save Failed', error?.message || 'Could not save the log report.');
+    }
+  };
   const handleUpdateReport = async (id, updates) => { await updateReport(id, updates); setSelected(prev => prev ? { ...prev, ...updates } : prev); };
   const handleDelete = id => {
     Alert.alert('Delete Entry?', 'This action cannot be undone.', [

@@ -804,7 +804,16 @@ export default function OwnerDashboardScreen() {
   };
 
   const handleRecordLog = rental => {
-    setPendingLogRental({ ...rental, rentalId: rental.id });
+    setPendingLogRental({
+      vehicleId: rental.vehicleId,
+      vehicleName: rental.vehicleName,
+      rentalId: rental.id,
+      renterName: rental.renterName,
+      renterEmail: rental.renterEmail,
+      startDate: rental.startDate,
+      endDate: rental.endDate,
+      amount: rental.totalPrice ?? rental.amount,
+    });
     setActiveTab('logreport');
   };
 

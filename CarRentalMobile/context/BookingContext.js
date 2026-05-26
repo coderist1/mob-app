@@ -83,7 +83,12 @@ const normalizeBookingRecord = (booking, fallback = {}) => {
     startDate: booking?.startDate ?? booking?.start_date ?? booking?.from ?? fallback.startDate ?? null,
     endDate: booking?.endDate ?? booking?.end_date ?? booking?.to ?? fallback.endDate ?? null,
     totalPrice: booking?.totalPrice ?? booking?.total_price ?? booking?.amount ?? booking?.price ?? fallback.totalPrice ?? null,
-    status: booking?.status ?? fallback.status ?? 'pending',
+    status: (() => {
+      const s = String(booking?.status ?? fallback.status ?? 'pending').toLowerCase();
+      if (s === 'active') return 'approved';
+      if (s === 'returned' || s === 'return_requested') return 'completed';
+      return s;
+    })(),
     createdAt: booking?.createdAt ?? booking?.created_at ?? booking?.timestamp ?? fallback.createdAt ?? new Date().toISOString(),
     updatedAt: booking?.updatedAt ?? booking?.updated_at ?? fallback.updatedAt ?? null,
     rejectionReason: booking?.rejectionReason ?? booking?.rejection_reason ?? fallback.rejectionReason ?? '',
@@ -183,145 +188,72 @@ export function BookingProvider({ children }) {
     });
   }, []);
 
-  const addBooking = useCallback((bookingData) => {
-    // attempt to create on server, fallback to local
-     const createRemote = async () => {
-       const toNumericId = (value) => {
-         const n = Number(value);
-         return Number.isFinite(n) && n > 0 ? n : null;
-       };
-
-       // Read session first; backend usually expects auth user PK for renterId.
-       let sessionUserId = null;
-       let sessionEmail = null;
-       try {
-         const sessRaw = await AsyncStorage.getItem('carRental.session.v2');
-         if (sessRaw) {
-           const sess = JSON.parse(sessRaw);
-           sessionUserId = toNumericId(sess?.id ?? sess?.pk ?? sess?.userId);
-           sessionEmail = sess?.email ?? null;
-         }
-       } catch (e) {
-         // ignore session read errors
-       }
-
-       // build a resilient payload that supplies multiple field variants
-       const payload = {
-         ...bookingData,
-         // duplicate common fields under different names the backend might expect
-         renterId: toNumericId(sessionUserId ?? bookingData.renterId ?? bookingData.renter_id ?? bookingData.renter),
-         renter: bookingData.renter ?? bookingData.renter_email ?? bookingData.renterEmail ?? sessionEmail ?? null,
-         vehicle: bookingData.vehicle ?? bookingData.vehicleId ?? bookingData.vehicle_id ?? bookingData.car ?? bookingData.carId ?? null,
-         vehicleId: bookingData.vehicleId ?? bookingData.vehicle ?? bookingData.vehicle_id ?? null,
-         start_date: bookingData.startDate ?? bookingData.start_date ?? bookingData.from ?? null,
-         end_date: bookingData.endDate ?? bookingData.end_date ?? bookingData.to ?? null,
-         total_price: bookingData.totalPrice ?? bookingData.total_price ?? bookingData.amount ?? bookingData.price ?? null,
-       };
-
-       // Provide alternate FK aliases often used by DRF serializers.
-       if (payload.renterId) {
-         payload.renter_id = payload.renterId;
-         // Some serializers expect `renter` itself to be a numeric FK.
-         payload.renter = payload.renterId;
-       }
-
-       // If we still don't have a numeric renterId but have an email, try to resolve the user id from the backend
-       async function resolveUserIdByEmail(email) {
-         if (!email) return null;
-         const tryEndpoints = ['/users/', '/customers/', '/accounts/', '/profiles/'];
-         for (const ep of tryEndpoints) {
-           try {
-             // many list endpoints accept ?email= query param
-             const res = await apiRequest(`${ep}?email=${encodeURIComponent(email)}`, { method: 'GET' });
-             if (Array.isArray(res) && res.length > 0) {
-               const first = res[0];
-               return first.user?.id ?? first.user?.pk ?? first.id ?? first.pk ?? first.userId ?? null;
-             }
-             if (res && (res.id || res.pk || res.user?.id || res.user?.pk)) {
-               return res.user?.id ?? res.user?.pk ?? res.id ?? res.pk;
-             }
-           } catch (e) {
-             // try next
-           }
-         }
-         return null;
-       }
-
-       try {
-         if ((!payload.renterId || payload.renterId === null) && payload.renter) {
-           const resolved = await resolveUserIdByEmail(payload.renter);
-           if (resolved) {
-             console.warn('[BookingContext] resolved renterId from email', payload.renter, '->', resolved);
-             payload.renterId = toNumericId(resolved);
-             payload.renter_id = payload.renterId;
-             payload.renter = payload.renterId;
-           }
-         }
-       } catch (e) {
-         // ignore resolve errors
-       }
-
-       // Remove non-numeric renterId values to avoid backend validation failures.
-       if (!toNumericId(payload.renterId)) {
-         delete payload.renterId;
-         delete payload.renter_id;
-       }
-
-       // Clean undefined/null fields that would confuse some backends
-       Object.keys(payload).forEach(k => { if (payload[k] === undefined) delete payload[k]; });
-
-        const endpoints = ['/api/bookings/', '/api/rentals/', '/api/reservations/'];
-       let created = null;
-       for (const ep of endpoints) {
-         try {
-           console.log('[BookingContext] createRemote trying', ep, 'body:', payload);
-           created = await apiRequest(ep, { method: 'POST', body: payload });
-           break;
-         } catch (e) {
-           // try next endpoint
-         }
-       }
-       return created;
-     };
-
-    const local = {
-      ...normalizeBookingRecord(bookingData, {
-        id: bookingData.id || `bk_${Date.now()}`,
-        status: bookingData.status || 'pending',
-        createdAt: bookingData.createdAt || new Date().toISOString(),
-      }),
+  const addBooking = useCallback(async (bookingData) => {
+    const toNumericId = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) && n > 0 ? n : null;
     };
 
-    // optimistic local add
+    let sessionUserId = null;
+    try {
+      const sessRaw = await AsyncStorage.getItem('carRental.session.v2');
+      if (sessRaw) {
+        const sess = JSON.parse(sessRaw);
+        sessionUserId = toNumericId(sess?.id ?? sess?.pk ?? sess?.userId);
+      }
+    } catch {
+      // ignore
+    }
+
+    const vehicleId = toNumericId(bookingData.vehicleId ?? bookingData.vehicle ?? bookingData.carId);
+    const renterId = toNumericId(sessionUserId ?? bookingData.renterId ?? bookingData.renter);
+
+    const payload = {
+      vehicle: vehicleId,
+      renter: renterId,
+      startDate: bookingData.startDate ?? bookingData.start_date ?? null,
+      endDate: bookingData.endDate ?? bookingData.end_date ?? null,
+      amount: Number(bookingData.totalPrice ?? bookingData.total_price ?? bookingData.amount ?? 0),
+      status: bookingData.status || 'pending',
+    };
+
+    if (!payload.vehicle || !payload.renter) {
+      throw new Error('Vehicle and renter are required to create a booking.');
+    }
+
+    const local = normalizeBookingRecord(bookingData, {
+      id: bookingData.id || `bk_${Date.now()}`,
+      status: bookingData.status || 'pending',
+      createdAt: bookingData.createdAt || new Date().toISOString(),
+    });
+
     mutateBookings((prev) => [...prev, local]);
 
-    // Try to persist remotely and reconcile
-    createRemote().then(async (created) => {
-      if (created) {
-        const normalized = normalizeBookingRecord(created, local);
-        // replace local placeholder with server-normalized record
-        mutateBookings(prev => prev.map(b => (String(b.id) === String(local.id) ? normalized : b)));
-
-        try {
-          const raw = await AsyncStorage.getItem(BOOKINGS_KEY);
-          const cur = raw ? JSON.parse(raw) : [];
-          const next = cur.map(b => (String(b.id) === String(local.id) ? normalized : b));
-          // if local wasn't present for some reason, append
-          if (!next.some(b => String(b.id) === String(normalized.id))) next.push(normalized);
-          await AsyncStorage.setItem(BOOKINGS_KEY, JSON.stringify(next));
-        } catch (e) {
-          // ignore persisting error
-        }
+    const endpoints = ['/api/bookings/', '/api/rentals/', '/api/reservations/'];
+    let created = null;
+    let lastError;
+    for (const ep of endpoints) {
+      try {
+        created = await apiRequest(ep, { method: 'POST', body: payload });
+        break;
+      } catch (error) {
+        lastError = error;
       }
-    }).catch(()=>{});
+    }
 
-    return local;
+    if (!created) {
+      mutateBookings((prev) => prev.filter((b) => String(b.id) !== String(local.id)));
+      throw lastError || new Error('Failed to create booking.');
+    }
+
+    const normalized = normalizeBookingRecord(created, local);
+    mutateBookings((prev) => prev.map((b) => (String(b.id) === String(local.id) ? normalized : b)));
+    return normalized;
   }, [mutateBookings]);
 
   const updateBooking = useCallback((bookingId, updates) => {
-    // update locally
     mutateBookings((prev) =>
-      prev.map((item) => (item.id === bookingId ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
+      prev.map((item) => (String(item.id) === String(bookingId) ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item))
     );
 
       // attempt to patch on server (best-effort)
@@ -341,7 +273,7 @@ export function BookingProvider({ children }) {
   const setBookingStatus = useCallback((bookingId, status, rejectionReason = '') => {
     mutateBookings((prev) =>
       prev.map((item) =>
-        item.id === bookingId
+        String(item.id) === String(bookingId)
           ? {
               ...item,
               status,
@@ -397,10 +329,9 @@ export function BookingProvider({ children }) {
   }, [bookings]);
 
   const returnVehicle = useCallback((bookingId, returnData = {}) => {
-    // update locally with returned status and return info
     mutateBookings((prev) =>
       prev.map((item) =>
-        item.id === bookingId
+        String(item.id) === String(bookingId)
           ? {
               ...item,
               status: 'completed',
@@ -451,20 +382,23 @@ export function BookingProvider({ children }) {
     };
 
     // optimistic attach to booking
-    mutateBookings(prev => prev.map(b => b.id === bookingId ? { ...b, damageReports: [...(b.damageReports || []), placeholder] } : b));
+    mutateBookings(prev => prev.map(b => String(b.id) === String(bookingId) ? { ...b, damageReports: [...(b.damageReports || []), placeholder] } : b));
 
     const payload = {
-      booking: bookingId,
-      bookingId,
-      vehicle: placeholder.vehicleId,
-      vehicleId: placeholder.vehicleId,
-      reporter: placeholder.reporterEmail,
-      reporterEmail: placeholder.reporterEmail,
-      description: placeholder.description,
-      photos: placeholder.photos,
+      type: 'damage',
+      vehicleId: Number(placeholder.vehicleId) || 0,
+      rentalId: Number(bookingId) || 0,
+      notes: placeholder.description,
+      photos: placeholder.photos || [],
+      issues: [],
+      customLabels: {
+        reporterEmail: placeholder.reporterEmail,
+        bookingId,
+        status: placeholder.status,
+      },
     };
 
-     const endpoints = ['/damage-reports/', '/damages/', '/reports/damage/'];
+     const endpoints = ['/api/damage-reports/', '/api/damage_reports/'];
     let created = null;
     for (const ep of endpoints) {
       try {
@@ -505,7 +439,40 @@ export function BookingProvider({ children }) {
     return (b && Array.isArray(b.damageReports)) ? b.damageReports : [];
   }, [bookings]);
 
-  const clearBookings = useCallback(() => persist([]), [persist]);
+  const deleteBooking = useCallback(async (bookingId) => {
+    mutateBookings((prev) => prev.filter((item) => String(item.id) !== String(bookingId)));
+
+    const endpoints = [
+      `/api/bookings/${bookingId}/`,
+      `/api/rentals/${bookingId}/`,
+      `/api/reservations/${bookingId}/`,
+    ];
+    for (const ep of endpoints) {
+      try {
+        await apiRequest(ep, { method: 'DELETE' });
+        return;
+      } catch {
+        // try next
+      }
+    }
+  }, [mutateBookings]);
+
+  const clearBookings = useCallback(async () => {
+    await persist([]);
+    try {
+      const sessRaw = await AsyncStorage.getItem('carRental.session.v2');
+      const sess = sessRaw ? JSON.parse(sessRaw) : null;
+      const userId = Number(sess?.id ?? sess?.pk ?? sess?.userId);
+      if (userId) {
+        await apiRequest('/api/bookings/clear_user_bookings/', {
+          method: 'DELETE',
+          body: { user_id: userId },
+        });
+      }
+    } catch (error) {
+      console.warn('[BookingContext] clear remote bookings failed', error);
+    }
+  }, [persist]);
 
   return (
     <BookingContext.Provider
@@ -521,6 +488,7 @@ export function BookingProvider({ children }) {
         getBookingsForRenter,
         getBookingsForOwner,
         getRentersForOwner,
+        deleteBooking,
         clearBookings,
         refreshBookings: loadBookings,
       }}

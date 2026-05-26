@@ -100,7 +100,10 @@ const toApiVehicle = (vehicleData) => {
     payload.seats = Number(vehicleData.seats) || vehicleData.seats;
   }
   if (vehicleData.fuel) payload.fuel = vehicleData.fuel;
-  if (vehicleData.photoUri) payload.photoUri = vehicleData.photoUri;
+  const photo = vehicleData.photoUri;
+  if (photo && (photo.startsWith('http://') || photo.startsWith('https://') || photo.startsWith('/'))) {
+    payload.image = photo.startsWith('/') ? photo : photo;
+  }
 
   return payload;
 };
@@ -183,41 +186,22 @@ export function VehicleProvider({ children }) {
       }
     }
 
-    // Include owner identifiers in payload so backend can set owner when unauthenticated
-    if (ownerIdentifier) {
-      payloadObj.owner = ownerIdentifier;
-      payloadObj.ownerId = ownerIdentifier;
-      payloadObj.owner_id = ownerIdentifier;
-      payloadObj.user = ownerIdentifier;
-      payloadObj.user_id = ownerIdentifier;
-      payloadObj.ownerEmail = ownerIdentifier;
-      payloadObj.owner_email = ownerIdentifier;
+    const numericOwnerId = Number(ownerIdentifier);
+    if (ownerIdentifier && Number.isFinite(numericOwnerId) && numericOwnerId > 0) {
+      payloadObj.ownerId = numericOwnerId;
     }
-
     if (ownerEmail) {
       payloadObj.ownerEmail = ownerEmail;
-      payloadObj.owner_email = ownerEmail;
-    }
-
-    let payload = payloadObj;
-    if (vehicleData.photoUri && !vehicleData.photoUri.startsWith('http')) {
-      payload = new FormData();
-      Object.entries(payloadObj).forEach(([k, v]) => {
-        if (k !== 'photoUri' && v !== undefined && v !== null) payload.append(k, String(v));
-      });
-      
-      const uri = vehicleData.photoUri;
-      const filename = uri.split('/').pop() || 'photo.jpg';
-      const type = `image/${filename.split('.').pop() || 'jpeg'}`;
-      payload.append('photo', { uri, name: filename, type });
-      payload.append('image', { uri, name: filename, type });
     }
 
     const created = await apiRequest('/api/cars/', {
       method: 'POST',
-      body: payload,
+      body: payloadObj,
     });
     let normalized = fromApiVehicle(created);
+    if (vehicleData.photoUri && !normalized.photoUri?.startsWith('http')) {
+      normalized = { ...normalized, photoUri: vehicleData.photoUri };
+    }
     console.warn('[VehicleContext] addVehicle created', normalized?.id, 'ownerId=', normalized?.ownerId, 'ownerName=', normalized?.ownerName);
     // Ensure owner info is present so owner views update immediately
     if ((ownerIdentifier || ownerName) && (!normalized.ownerId || normalized.ownerId === null)) {
@@ -254,31 +238,19 @@ export function VehicleProvider({ children }) {
         body.seats = Number(updates.seats) || updates.seats;
       }
       if (updates.fuel) body.fuel = updates.fuel;
-      if (updates.photoUri) body.photoUri = updates.photoUri;
-
-      let payload = body;
-      if (updates.photoUri && !updates.photoUri.startsWith('http')) {
-        payload = new FormData();
-        Object.entries(body).forEach(([k, v]) => {
-          if (k !== 'photoUri' && v !== undefined && v !== null) payload.append(k, String(v));
-        });
-        const uri = updates.photoUri;
-        const filename = uri.split('/').pop() || 'photo.jpg';
-        const type = `image/${filename.split('.').pop() || 'jpeg'}`;
-        payload.append('photo', { uri, name: filename, type });
-        payload.append('image', { uri, name: filename, type });
+      const photo = updates.photoUri;
+      if (photo && (photo.startsWith('http://') || photo.startsWith('https://') || photo.startsWith('/'))) {
+        body.image = photo;
       }
 
-      if (payload instanceof FormData) {
-        console.warn('[VehicleContext] updateVehicle sending FormData payload for id=', id);
-      } else {
-        try { console.warn('[VehicleContext] updateVehicle payload', JSON.stringify(payload)); } catch { console.warn('[VehicleContext] updateVehicle payload (unserializable)'); }
-      }
       const updated = await apiRequest(`/api/cars/${id}/`, {
         method: 'PATCH',
-        body: payload,
+        body,
       });
-      const normalized = fromApiVehicle(updated);
+      let normalized = fromApiVehicle(updated);
+      if (updates.photoUri && !normalized.photoUri?.startsWith('http')) {
+        normalized = { ...normalized, photoUri: updates.photoUri };
+      }
       mutateVehicles((prev) => prev.map((v) => (v.id === id ? normalized : v)));
       return normalized;
     } catch (error) {

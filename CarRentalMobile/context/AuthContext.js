@@ -29,8 +29,26 @@ export function AuthProvider({ children }) {
         delete userData.jwt;
         delete userData.accessToken;
         delete userData.access_token;
-        
+
         userData.role = userData.role || 'renter';
+
+        if (savedSession.token) {
+          try {
+            const fresh = await apiRequest('/api/me/');
+            Object.assign(userData, fresh?.user || fresh);
+            userData.role = userData.role || savedSession.role || 'renter';
+            await AsyncStorage.setItem(
+              SESSION_KEY,
+              JSON.stringify({ ...userData, token: savedSession.token }),
+            );
+          } catch {
+            // keep cached session when offline
+          }
+        }
+
+        const photoKey = `${PHOTO_KEY_PREFIX}${userData.email || userData.id}`;
+        const savedPhoto = await AsyncStorage.getItem(photoKey);
+        if (savedPhoto) userData.photoUri = savedPhoto;
 
         if (!mounted) return;
         setUser(userData);
@@ -50,7 +68,7 @@ export function AuthProvider({ children }) {
 
 const persistAuth = useCallback(async (authData) => {
     const token = authData?.token || authData?.access || authData?.authToken || authData?.key || authData?.jwt || authData?.accessToken || authData?.access_token;
-    
+
     const userData = authData?.user ? { ...authData.user } : { ...authData };
     delete userData.token;
     delete userData.access;
@@ -59,14 +77,11 @@ const persistAuth = useCallback(async (authData) => {
     delete userData.jwt;
     delete userData.accessToken;
     delete userData.access_token;
-    
+
     userData.role = userData.role || 'renter';
 
-    const session = { ...userData };
-    if (token) session.token = token;
-    
     setUser(userData);
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify({ ...userData, token }));
   }, []);
 
   const login = useCallback(async (email, password) => {
@@ -78,7 +93,10 @@ const persistAuth = useCallback(async (authData) => {
       });
 
       const me = loginData?.user || loginData;
-      await persistAuth(loginData);
+      if (!me?.id && loginData?.token && String(loginData.token).match(/^\d+$/)) {
+        me.id = Number(loginData.token);
+      }
+      await persistAuth({ ...loginData, user: me });
       return { ok: true, user: me };
     } catch (error) {
       return { ok: false, error: error.message || 'Invalid email or password.' };
@@ -114,6 +132,11 @@ const persistAuth = useCallback(async (authData) => {
   }, [login]);
 
   const logout = useCallback(async () => {
+    try {
+      await apiRequest('/api/logout/', { method: 'POST' });
+    } catch {
+      // ignore logout errors
+    }
     setUser(null);
     await AsyncStorage.removeItem(SESSION_KEY);
   }, []);
@@ -167,11 +190,11 @@ const updateUser = useCallback(async (partial) => {
       // This handles cases where API returns old/cached data
       const normalizedResponse = {
         ...nextUser,
-        firstName: payload.first_name ?? nextUser.firstName ?? nextUser.first_name ?? user?.firstName ?? '',
-        lastName: payload.last_name ?? nextUser.lastName ?? nextUser.last_name ?? user?.lastName ?? '',
-        middleName: payload.middle_name ?? nextUser.middleName ?? nextUser.middle_name ?? user?.middleName ?? '',
+        firstName: payload.firstName ?? nextUser.firstName ?? nextUser.first_name ?? user?.firstName ?? '',
+        lastName: payload.lastName ?? nextUser.lastName ?? nextUser.last_name ?? user?.lastName ?? '',
+        middleName: payload.middleName ?? nextUser.middleName ?? nextUser.middle_name ?? user?.middleName ?? '',
         phone: payload.phone ?? nextUser.phone ?? nextUser.phoneNumber ?? nextUser.phone_number ?? user?.phone ?? '',
-        photoUri: payload.photo_uri ?? nextUser.photoUri ?? nextUser.photo_uri ?? user?.photoUri ?? '',
+        photoUri: user?.photoUri ?? nextUser.photoUri ?? nextUser.photo_uri ?? '',
       };
 
       const mergedUser = { ...user, ...normalizedResponse };
@@ -190,7 +213,23 @@ const updateUser = useCallback(async (partial) => {
       throw error;
     }
   }, [user]);
-  const updatePhoto = useCallback((uri) => updateUser({ photo_uri: uri ?? null }), [updateUser]);
+  const updatePhoto = useCallback(async (uri) => {
+    const photoKey = `${PHOTO_KEY_PREFIX}${user?.email || user?.id || 'default'}`;
+    if (uri) {
+      await AsyncStorage.setItem(photoKey, uri);
+    } else {
+      await AsyncStorage.removeItem(photoKey);
+    }
+    const mergedUser = { ...(user || {}), photoUri: uri ?? null };
+    setUser(mergedUser);
+    const sessionRaw = await AsyncStorage.getItem(SESSION_KEY);
+    const existingSession = sessionRaw ? JSON.parse(sessionRaw) : {};
+    await AsyncStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ ...existingSession, ...mergedUser, token: existingSession.token }),
+    );
+    return mergedUser;
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, users: [], loading, login, register, logout, updateUser, updatePhoto }}>

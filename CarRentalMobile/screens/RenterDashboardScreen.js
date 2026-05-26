@@ -392,24 +392,23 @@ function HomeTab({ vehicles, onCreateBooking, user, savedVehicleIds, onToggleSav
     setDetailModal(true);
   };
 
-  const handleConfirmRent = (data) => {
+  const handleConfirmRent = async (data) => {
     if (!selVehicle) {
       Alert.alert('Error', 'No vehicle selected. Please try again.');
       return;
     }
-    
-    // Get the photo URI from the vehicle object - it's already processed by VehicleContext
-    // The vehicle object already has a 'photoUri' property from fromApiVehicle()
+
     const vehiclePhotoUri = selVehicle.photoUri || null;
-    
+
     const newBooking = {
       id: `rent-${Date.now()}`,
       vehicleId: selVehicle.id,
       vehicleName: selVehicle.name || selVehicle.model || 'Vehicle',
       vehicleModel: selVehicle.model || selVehicle.name || '',
-      vehiclePhotoUri: vehiclePhotoUri,  // Use the photo URI from the vehicle
+      vehiclePhotoUri,
       year: selVehicle.year,
       ownerId: selVehicle.ownerId,
+      ownerEmail: selVehicle.ownerEmail,
       ownerName: selVehicle.ownerName || 'Owner',
       renterEmail: user?.email,
       renterName: user?.fullName || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Renter',
@@ -422,9 +421,14 @@ function HomeTab({ vehicles, onCreateBooking, user, savedVehicleIds, onToggleSav
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
-    onCreateBooking(newBooking);
-    setRentModal(false);
-    Alert.alert('Request Sent', 'Your rental request has been submitted and is awaiting approval from the owner.');
+
+    try {
+      await onCreateBooking(newBooking);
+      setRentModal(false);
+      Alert.alert('Request Sent', 'Your rental request has been submitted and is awaiting approval from the owner.');
+    } catch (error) {
+      Alert.alert('Booking Failed', error?.message || 'Could not save your booking. Please try again.');
+    }
   };
 
   return (

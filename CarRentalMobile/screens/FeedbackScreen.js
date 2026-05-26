@@ -189,28 +189,34 @@ function FeedbackModal({ visible, booking, userRole, userEmail, onSubmit, onClos
   const [message, setMessage] = useState('');
   const [feedbackType, setFeedbackType] = useState('general');
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!message.trim()) {
       Alert.alert('Missing Info', 'Please share your feedback message.');
       return;
     }
 
-    onSubmit({
-      bookingId: booking.id,
-      fromUserEmail: userEmail,
-      fromUserRole: userRole,
-      toUserEmail: userRole === 'renter' ? booking.ownerEmail : booking.renterEmail,
-      toUserRole: userRole === 'renter' ? 'owner' : 'renter',
-      rating,
-      message: message.trim(),
-      type: feedbackType,
-    });
+    try {
+      await onSubmit({
+        bookingId: booking.id,
+        vehicleId: booking.vehicleId,
+        vehicleName: booking.vehicleName,
+        fromUserEmail: userEmail,
+        fromUserRole: userRole,
+        toUserEmail: userRole === 'renter' ? booking.ownerEmail : booking.renterEmail,
+        toUserRole: userRole === 'renter' ? 'owner' : 'renter',
+        rating,
+        message: message.trim(),
+        type: feedbackType,
+      });
 
-    setMessage('');
-    setRating(5);
-    setFeedbackType('general');
-    onClose();
-    Alert.alert('Thank You', 'Your feedback has been submitted successfully.');
+      setMessage('');
+      setRating(5);
+      setFeedbackType('general');
+      onClose();
+      Alert.alert('Thank You', 'Your feedback has been saved successfully.');
+    } catch (error) {
+      Alert.alert('Save Failed', error?.message || 'Could not save your feedback.');
+    }
   };
 
   return (
@@ -350,8 +356,9 @@ export default function FeedbackScreen() {
     setModalVisible(true);
   };
 
-  const handleSubmitFeedback = (feedbackData) => {
-    addFeedback(feedbackData);
+  const handleSubmitFeedback = async (feedbackData) => {
+    await addFeedback(feedbackData);
+    await refreshFeedback();
   };
 
   const filters = [
